@@ -20,28 +20,35 @@
     var CONFIG = {"hostname":"troyeeee673.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":"default"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":true,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":true,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
   </script>
 
-  <meta property="og:type" content="website">
-<meta property="og:title" content="Linux系统编程">
-<meta property="og:url" content="https://troyeeee673.github.io/index.html">
+  <meta name="description" content="系统编程：I&#x2F;O 基础与标准 I&#x2F;O 实战笔记一、 I&#x2F;O的重要性在 Linux&#x2F;Unix 系统编程中，I&#x2F;O 是最基础也最容易被低估的一部分。无论是普通文件、目录、设备、管道还是 socket，最终都会以“可读写对象”的形式参与程序运行。先把标准 I&#x2F;O 和文件对象理解清楚，后面学习系统调用 I&#x2F;O、进程间通信、网络通信时会顺">
+<meta property="og:type" content="article">
+<meta property="og:title" content="第一章、标准IO">
+<meta property="og:url" content="https://troyeeee673.github.io/2026/06/07/%E7%AC%AC%E4%B8%80%E7%AB%A0%E3%80%81%E6%A0%87%E5%87%86IO/index.html">
 <meta property="og:site_name" content="Linux系统编程">
+<meta property="og:description" content="系统编程：I&#x2F;O 基础与标准 I&#x2F;O 实战笔记一、 I&#x2F;O的重要性在 Linux&#x2F;Unix 系统编程中，I&#x2F;O 是最基础也最容易被低估的一部分。无论是普通文件、目录、设备、管道还是 socket，最终都会以“可读写对象”的形式参与程序运行。先把标准 I&#x2F;O 和文件对象理解清楚，后面学习系统调用 I&#x2F;O、进程间通信、网络通信时会顺">
 <meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-06-07T08:30:01.000Z">
+<meta property="article:modified_time" content="2026-06-07T08:31:01.343Z">
 <meta property="article:author" content="Huiting_Yang">
+<meta property="article:tag" content="C语言">
+<meta property="article:tag" content="Linux系统编程">
+<meta property="article:tag" content="软件相关">
 <meta name="twitter:card" content="summary">
 
-<link rel="canonical" href="https://troyeeee673.github.io/">
+<link rel="canonical" href="https://troyeeee673.github.io/2026/06/07/%E7%AC%AC%E4%B8%80%E7%AB%A0%E3%80%81%E6%A0%87%E5%87%86IO/">
 
 
 <script id="page-configurations">
   // https://hexo.io/docs/variables.html
   CONFIG.page = {
     sidebar: "",
-    isHome : true,
-    isPost : false,
+    isHome : false,
+    isPost : true,
     lang   : 'zh-CN'
   };
 </script>
 
-  <title>Linux系统编程</title>
+  <title>第一章、标准IO | Linux系统编程</title>
   
 
 
@@ -182,9 +189,10 @@
         <div class="content-wrap">
           
 
-          <div class="content index posts-expand">
+          <div class="content post posts-expand">
             
-      
+
+    
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
@@ -200,10 +208,9 @@
       <meta itemprop="name" content="Linux系统编程">
     </span>
       <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2026/06/07/%E7%AC%AC%E4%B8%80%E7%AB%A0%E3%80%81%E6%A0%87%E5%87%86IO/" class="post-title-link" itemprop="url">第一章、标准IO</a>
-        </h2>
+        <h1 class="post-title" itemprop="name headline">
+          第一章、标准IO
+        </h1>
 
         <div class="post-meta">
             <span class="post-meta-item">
@@ -236,7 +243,7 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <h1 id="系统编程：I-O-基础与标准-I-O-实战笔记"><a href="#系统编程：I-O-基础与标准-I-O-实战笔记" class="headerlink" title="系统编程：I&#x2F;O 基础与标准 I&#x2F;O 实战笔记"></a>系统编程：I&#x2F;O 基础与标准 I&#x2F;O 实战笔记</h1><h2 id="一、-I-O的重要性"><a href="#一、-I-O的重要性" class="headerlink" title="一、 I&#x2F;O的重要性"></a>一、 I&#x2F;O的重要性</h2><p>在 Linux&#x2F;Unix 系统编程中，I&#x2F;O 是最基础也最容易被低估的一部分。无论是普通文件、目录、设备、管道还是 socket，最终都会以“可读写对象”的形式参与程序运行。先把标准 I&#x2F;O 和文件对象理解清楚，后面学习系统调用 I&#x2F;O、进程间通信、网络通信时会顺很多。在Linux中有一句很经典的话：“一切皆文件”，所有我们在linux中进行的操作都是基于文件进行的，而对文件操作无非就是读写，涉及到读写就必须借助IO。所以说IO很重要。</p>
+        <h1 id="系统编程：I-O-基础与标准-I-O-实战笔记"><a href="#系统编程：I-O-基础与标准-I-O-实战笔记" class="headerlink" title="系统编程：I&#x2F;O 基础与标准 I&#x2F;O 实战笔记"></a>系统编程：I&#x2F;O 基础与标准 I&#x2F;O 实战笔记</h1><h2 id="一、-I-O的重要性"><a href="#一、-I-O的重要性" class="headerlink" title="一、 I&#x2F;O的重要性"></a>一、 I&#x2F;O的重要性</h2><p>在 Linux&#x2F;Unix 系统编程中，I&#x2F;O 是最基础也最容易被低估的一部分。无论是普通文件、目录、设备、管道还是 socket，最终都会以“可读写对象”的形式参与程序运行。先把标准 I&#x2F;O 和文件对象理解清楚，后面学习系统调用 I&#x2F;O、进程间通信、网络通信时会顺很多。在Linux中有一句很经典的话：“一切皆文件”，所有我们在linux中进行的操作都是基于文件进行的，而对文件操作无非就是读写，涉及到读写就必须借助IO。所以说IO很重要。</p>
 <p>重点可以概括为一句话：区分标准 I&#x2F;O 与系统调用 I&#x2F;O，掌握文件打开模式、缓冲机制、文件定位、目录操作和常见练习任务。</p>
 <h2 id="二、文件概念：狭义文件与广义文件"><a href="#二、文件概念：狭义文件与广义文件" class="headerlink" title="二、文件概念：狭义文件与广义文件"></a>二、文件概念：狭义文件与广义文件</h2><p>文件的分类：</p>
 <ul>
@@ -477,21 +484,28 @@
 <p><code>练习任务代码开源地址</code>:<a target="_blank" rel="noopener" href="https://github.com/troyeeee673/Linux-">https://github.com/troyeeee673/Linux-</a></p>
 <h2 id="总结-1"><a href="#总结-1" class="headerlink" title="总结"></a>总结</h2><p>标准 I&#x2F;O 的价值在于简单、可移植、吞吐量高。它通过缓冲减少系统调用次数，适合大多数普通文件读写场景。真正需要精细控制文件描述符、阻塞行为、文件锁、I&#x2F;O 复用时，再进入系统调用 I&#x2F;O。学完这一章，最重要的是把 <code>FILE *</code>、缓冲、文件定位和资源释放这几个点练熟。</p>
 
-      
     </div>
 
     
     
     
+
       <footer class="post-footer">
-        <div class="post-eof"></div>
+          <div class="post-tags">
+              <a href="/tags/%E8%BD%AF%E4%BB%B6%E7%9B%B8%E5%85%B3/" rel="tag"># 软件相关</a>
+              <a href="/tags/Linux%E7%B3%BB%E7%BB%9F%E7%BC%96%E7%A8%8B/" rel="tag"># Linux系统编程</a>
+              <a href="/tags/C%E8%AF%AD%E8%A8%80/" rel="tag"># C语言</a>
+          </div>
+
+        
+
+
+        
       </footer>
+    
   </article>
   
   
-  
-
-
   
 
 
@@ -544,6 +558,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%B3%BB%E7%BB%9F%E7%BC%96%E7%A8%8B%EF%BC%9AI-O-%E5%9F%BA%E7%A1%80%E4%B8%8E%E6%A0%87%E5%87%86-I-O-%E5%AE%9E%E6%88%98%E7%AC%94%E8%AE%B0"><span class="nav-number">1.</span> <span class="nav-text">系统编程：I&#x2F;O 基础与标准 I&#x2F;O 实战笔记</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81-I-O%E7%9A%84%E9%87%8D%E8%A6%81%E6%80%A7"><span class="nav-number">1.1.</span> <span class="nav-text">一、 I&#x2F;O的重要性</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E6%96%87%E4%BB%B6%E6%A6%82%E5%BF%B5%EF%BC%9A%E7%8B%AD%E4%B9%89%E6%96%87%E4%BB%B6%E4%B8%8E%E5%B9%BF%E4%B9%89%E6%96%87%E4%BB%B6"><span class="nav-number">1.2.</span> <span class="nav-text">二、文件概念：狭义文件与广义文件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E6%A0%87%E5%87%86-I-O%EF%BC%9A%E5%9B%B4%E7%BB%95-FILE-%E5%B1%95%E5%BC%80"><span class="nav-number">1.3.</span> <span class="nav-text">三、标准 I&#x2F;O：围绕 FILE * 展开</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E6%96%87%E4%BB%B6%E6%89%93%E5%BC%80%E6%A8%A1%E5%BC%8F"><span class="nav-number">1.4.</span> <span class="nav-text">四、文件打开模式</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81fgets-%E4%B8%8E-gets-%EF%BC%9A%E5%AE%89%E5%85%A8%E8%BE%B9%E7%95%8C"><span class="nav-number">1.5.</span> <span class="nav-text">六、fgets() 与 gets()：安全边界</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E6%96%87%E4%BB%B6%E5%AE%9A%E4%BD%8D%EF%BC%9Afseek-%E3%80%81ftell-%E3%80%81rewind"><span class="nav-number">1.6.</span> <span class="nav-text">七、文件定位：fseek()、ftell()、rewind()</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AB%E3%80%81%E7%BC%93%E5%86%B2%E6%9C%BA%E5%88%B6%EF%BC%9A%E6%A0%87%E5%87%86-I-O-%E4%B8%BA%E4%BB%80%E4%B9%88%E5%BF%AB"><span class="nav-number">1.7.</span> <span class="nav-text">八、缓冲机制：标准 I&#x2F;O 为什么快</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E6%A0%87%E5%87%86-I-O-%E4%B8%8E%E7%B3%BB%E7%BB%9F-I-O-%E7%9A%84%E5%8C%BA%E5%88%AB"><span class="nav-number">1.7.1.</span> <span class="nav-text">1. 标准 I&#x2F;O 与系统 I&#x2F;O 的区别</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E4%B8%BA%E4%BB%80%E4%B9%88%E6%A0%87%E5%87%86-I-O-%E6%9B%B4%E5%BF%AB"><span class="nav-number">1.7.2.</span> <span class="nav-text">2. 为什么标准 I&#x2F;O 更快</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%A4%BA%E4%BE%8B"><span class="nav-number">1.7.3.</span> <span class="nav-text">示例</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%96%B9%E6%B3%95%E4%B8%80%EF%BC%9A%E6%AF%8F%E6%AC%A1%E8%AF%BB%E5%86%99-1-%E5%AD%97%E8%8A%82"><span class="nav-number">1.7.3.1.</span> <span class="nav-text">方法一：每次读写 1 字节</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%96%B9%E6%B3%95%E4%BA%8C%EF%BC%9A%E5%9D%97%E8%AF%BB%E5%86%99"><span class="nav-number">1.7.3.2.</span> <span class="nav-text">方法二：块读写</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-%E4%B8%89%E7%A7%8D%E7%BC%93%E5%86%B2%E6%96%B9%E5%BC%8F"><span class="nav-number">1.7.4.</span> <span class="nav-text">3. 三种缓冲方式</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%A1%8C%E7%BC%93%E5%86%B2%EF%BC%88Line-Buffer%EF%BC%89"><span class="nav-number">1.7.4.1.</span> <span class="nav-text">行缓冲（Line Buffer）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%85%A8%E7%BC%93%E5%86%B2%EF%BC%88Full-Buffer%EF%BC%89"><span class="nav-number">1.7.4.2.</span> <span class="nav-text">全缓冲（Full Buffer）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%97%A0%E7%BC%93%E5%86%B2%EF%BC%88Unbuffered%EF%BC%89"><span class="nav-number">1.7.4.3.</span> <span class="nav-text">无缓冲（Unbuffered）</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-fflush"><span class="nav-number">1.7.5.</span> <span class="nav-text">4. fflush()</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8B%E9%9D%A2%E4%BB%A3%E7%A0%81%E7%9C%8B%E4%B8%8D%E5%88%B0%E8%BE%93%E5%87%BA"><span class="nav-number">1.7.6.</span> <span class="nav-text">5. 为什么下面代码看不到输出</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%80%BB%E7%BB%93"><span class="nav-number">1.7.7.</span> <span class="nav-text">总结</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B9%9D%E3%80%81%E4%B8%B4%E6%97%B6%E6%96%87%E4%BB%B6%E4%B8%8E%E7%9B%AE%E5%BD%95%E6%93%8D%E4%BD%9C"><span class="nav-number">1.8.</span> <span class="nav-text">九、临时文件与目录操作</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8D%81%E3%80%81%E7%BB%83%E4%B9%A0%E4%BB%BB%E5%8A%A1"><span class="nav-number">1.9.</span> <span class="nav-text">十、练习任务</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%BB%E7%BB%93-1"><span class="nav-number">1.10.</span> <span class="nav-text">总结</span></a></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
