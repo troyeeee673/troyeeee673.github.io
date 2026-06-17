@@ -188,6 +188,245 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://troyeeee673.github.io/2026/06/08/%E5%B5%8C%E5%85%A5%E5%BC%8F%E9%80%9A%E4%BF%A1%E5%B8%B8%E8%A7%81%E5%8D%8F%E8%AE%AE/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/troye.jpg">
+      <meta itemprop="name" content="Huiting_Yang">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Linux系统编程">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2026/06/08/%E5%B5%8C%E5%85%A5%E5%BC%8F%E9%80%9A%E4%BF%A1%E5%B8%B8%E8%A7%81%E5%8D%8F%E8%AE%AE/" class="post-title-link" itemprop="url">嵌入式通信常见协议</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-06-08 17:46:52 / 修改时间：17:56:58" itemprop="dateCreated datePublished" datetime="2026-06-08T17:46:52+08:00">2026-06-08</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%8D%8F%E8%AE%AE/" itemprop="url" rel="index"><span itemprop="name">协议</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h1 id="协议"><a href="#协议" class="headerlink" title="协议"></a>协议</h1><h2 id="UART通用异步收发器：点对点，单端"><a href="#UART通用异步收发器：点对点，单端" class="headerlink" title="UART通用异步收发器：点对点，单端"></a>UART通用异步收发器：点对点，单端</h2><ul>
+<li>是一种串行、异步通信总线，有两根数据线，可以实现全双工发送和接收数据。</li>
+<li>在UART中，规定先发送低位数据，每次发送的数据帧包含起始位一位，数据位5~8位，校验位一位（可有可无），<br>停止位1、1.5、2位。每次最多只能发送8位数据，要发送下一字节，必须先停止，再重复上述过程。这是为了防止接收双发<br>方时钟有误差导致误差积累，数据错位。</li>
+<li>缺点：<br>电器接口不统一：<br>  只对信号时序进行了定义（数据帧格式），没有统一的电气标准（如未规定高电平到底是多高等1）<br>  没有统一的连接器标准<br>抗干扰能力差：直接使用TTL信号表示1、0<br>传输距离短</li>
+</ul>
+<h2 id="USART通用同步-异步收发器：点对点，单端"><a href="#USART通用同步-异步收发器：点对点，单端" class="headerlink" title="USART通用同步&#x2F;异步收发器：点对点，单端"></a>USART通用同步&#x2F;异步收发器：点对点，单端</h2><p>这里相对于UART多了一个输出时钟sclk（为了兼容其他协议），但是这个时钟是只能对外输出，不能输入的，所以USART只能进行异步传输</p>
+<ul>
+<li>8&#x2F;9位数据</li>
+<li>一般选择8位无校验和9位有校验<br>停止位：0.5&#x2F;1&#x2F;1.5&#x2F;2</li>
+<li>线：<br>  1、RXD<br>  2、TXD<br>  3、VCC<br>  4、GND(共地)</li>
+<li>接受和发送单独存在寄存器</li>
+<li>通信过程<br>  1、<strong>初始化</strong>：设置波特率、数据位、停止位、校验位等参数。<br>  2、<strong>发送</strong>：CPU将数据写入发送数据寄存器，硬件自动添加起始位、校验位和停止位，并按位发送。<br>  3、<strong>接收</strong>：硬件检测到起始位后，按位采样接收数据，完成一帧后，硬件自动进行奇偶校验，校验通过后将数据存入接收数据寄存器，并置位标志位，CPU读取即可。</li>
+</ul>
+<h2 id="RS232-RS485（电器层协议）"><a href="#RS232-RS485（电器层协议）" class="headerlink" title="RS232 &amp;&amp; RS485（电器层协议）"></a>RS232 &amp;&amp; RS485（电器层协议）</h2><h3 id="RS232（一种标准）：用于改善UART存在的不足，通过一个电平转换芯片进行TTL和RS232转换"><a href="#RS232（一种标准）：用于改善UART存在的不足，通过一个电平转换芯片进行TTL和RS232转换" class="headerlink" title="RS232（一种标准）：用于改善UART存在的不足，通过一个电平转换芯片进行TTL和RS232转换"></a>RS232（一种标准）：用于改善UART存在的不足，通过一个电平转换芯片进行TTL和RS232转换</h3><ul>
+<li>点对点</li>
+<li>接口标准：<br>  使用一种具有25引脚的DB-25连接器，对每个引脚信号加以规定，后来由IBM进行简化，变为9个引脚，但最常用的就是只使用其中3个（RXD，TXD，GND）</li>
+<li>电平标准(不要记反了)：<br>  规定逻辑”0”的电平范围：+5 ~ +15V<br>  规定逻辑”1”的电平范围：-5 ~ -15V<br>  提高了抗干扰能力，传输距离可达15m</li>
+<li>存在共模干扰</li>
+<li>与TTL不兼容，通过一个电平转换芯片进行TTL和RS232转换</li>
+<li>电压大，易损坏器件</li>
+</ul>
+<h3 id="RS485"><a href="#RS485" class="headerlink" title="RS485"></a>RS485</h3><ul>
+<li>能够在远距离、电子噪声干扰大的条件下进行数据有效传输（使用差分信号进行传输，抑制共模干扰）</li>
+<li>允许连接多个收发器，具有多站功能，多对多</li>
+<li>电位差 +2 ~ +6 表示逻辑“1”</li>
+<li>电位差 -2 ~ -6 表示逻辑“0”</li>
+<li>使用差分信号，极大降低了共模干扰</li>
+<li>与TTL兼容，但需要添加电路，将TTL转换为差分</li>
+<li>电压相对RS232小，不容易损坏器件</li>
+<li>两线制的RS485是半双工（这两根总线上可以挂载多个节点，一个信号要用两根线表示，所以发送和接收不能同时进行）</li>
+</ul>
+<h2 id="IIC-串行、半双工，用于近距离，低速率通信，多主机通信"><a href="#IIC-串行、半双工，用于近距离，低速率通信，多主机通信" class="headerlink" title="IIC:串行、半双工，用于近距离，低速率通信，多主机通信"></a>IIC:串行、半双工，用于近距离，低速率通信，多主机通信</h2><ul>
+<li>高位先行，主机从机共用SCL和SDA，SCL和SDA都由电阻弱上拉。</li>
+<li>使用一个数据寄存器和一个数据移位寄存器，因为是半双工，可以共用</li>
+<li>线：<br>  1、SCL（时钟线）<br>  SCL被发送器低电平，发送器进行发送数据，SCL高电平时，接收器进行读取数据，发送完一个字节（8bit）数据后，接收器发送一bit应答信号<br>  注意：SCL始终由主机控制，所以从机不管是要发送还是要读取，都应该在SCL变化的上升沿或下降沿进行（因为不确定SCL何时再次变化）<br>  2、SDA</li>
+<li>分为主机和从机，可以存在多主机（分时）和多从机，多主机同时发起通信时，通过冲突检测和总线仲裁来防止错误</li>
+<li>三种时序<br> 1、主机指定地址写<br> 2、主机当前地址读<br> 3、主机指定地址读（先使用指定地址写，改变当前地址指针，然后切换为当前地址读）</li>
+<li>设备支持7位地址和10位地址，7位地址使用一个字节，10位地址使用2个字节，其中多出的5位作为10位地址的标志位11110</li>
+<li>实现：<br>  1、软件I2C<br>  2、硬件I2C</li>
+</ul>
+<h2 id="SPI（串行外设接口）：全双工，高速（相对），同步"><a href="#SPI（串行外设接口）：全双工，高速（相对），同步" class="headerlink" title="SPI（串行外设接口）：全双工，高速（相对），同步"></a>SPI（串行外设接口）：全双工，高速（相对），同步</h2><ul>
+<li>高位先行</li>
+<li>线（至少4条）：在有多个从机时，需要多条CS片选线<br>  1、SCLK<br>  2、MOSI<br>  3、MISO<br>  4、CS</li>
+<li>没有起始信号、停止信号和应答信号</li>
+<li>使用一个寄存器DR进行数据接收和发送，在移出数据的同时可以在另一端接收数据</li>
+<li>移位寄存器有两个，分别用于存储发送数据和接收数据（因为二者同步进行）</li>
+<li>极性（CPOL）和相位（CPHA）：决定SPI工作模式<br>（一般来说主机的SPI）模式是由从机的SPI模式决定的，因为从机的SPI在制作时确定，主机只能兼容从机进行通信<br>  CPOL &#x3D; 0：空闲时SCLK为低电平<br>  CPOL &#x3D; 1：空闲时SCLK为高电平<br>  CPHA &#x3D; 0：在每个时钟周期的第一个时钟沿采样<br>  CPHA &#x3D; 1：在每个时钟周期的第二个时钟沿采样</li>
+</ul>
+<h2 id="USB：通用串行总线，和UART一样是一种可靠的协议，低位先行"><a href="#USB：通用串行总线，和UART一样是一种可靠的协议，低位先行" class="headerlink" title="USB：通用串行总线，和UART一样是一种可靠的协议，低位先行"></a>USB：通用串行总线，和UART一样是一种可靠的协议，低位先行</h2><ul>
+<li>线：与串口一致，数据线作为差分线，通过协议的实现达到全双工<br>  1、VCC<br>  2、GND<br>  3、D+<br>  4、D-</li>
+<li>使用反向不归零编码（NRZI），可以不使用时钟线</li>
+<li>数据格式<br>  第一层封装：SOP + DATA + EOP（包开始 + 数据 + 包结束）<br>  包格式：<br>  PID（packet id） ADDR EP(endpoint)   DATA   CRC<br>  包类型：<ul>
+<li>令牌数据包</li>
+<li>数据数据包</li>
+<li>握手数据包</li>
+<li>其他数据包</li>
+</ul>
+</li>
+</ul>
+<h2 id="CAN总线（Controller-Area-NET-Bus）控制器局域网总线：多个主设备相互通信"><a href="#CAN总线（Controller-Area-NET-Bus）控制器局域网总线：多个主设备相互通信" class="headerlink" title="CAN总线（Controller Area NET Bus）控制器局域网总线：多个主设备相互通信"></a>CAN总线（Controller Area NET Bus）控制器局域网总线：多个主设备相互通信</h2><h3 id="CAN简介"><a href="#CAN简介" class="headerlink" title="CAN简介"></a>CAN简介</h3><ul>
+<li>半双工，多个设备同时发送时通过总线仲裁决定顺序</li>
+<li>使用差分信号对，CAN_L,CAN_H，可以不共地<br>注意：虽然可以不共地，不共地会使收发器承受较高的共模电压，所以一般为了安全 会共地。<br>此外，如果需要通过CAN总线进行供电，则还需一根接电源正的线，这4根线构成了CAN总线的完整结构<br>-高速CAN：ISO11898   &lt; 40m：高速CAN距离短是因为速率高导致信号衰减增大<br>-低速CAN：ISO1519    &lt; 1km</li>
+<li>11&#x2F;29报文id，用于区分消息功能、决定优先级（id小的报文先发送）</li>
+</ul>
+<h3 id="CAN硬件电路"><a href="#CAN硬件电路" class="headerlink" title="CAN硬件电路"></a>CAN硬件电路</h3><ul>
+<li>每个设备通过CAN收发器挂载到CAN总线网络上</li>
+<li>CAN控制器的TX、RX与收发器的TX、RX相连，收发器的CAN_L,CAN_H与总线的CAN_L,CAN_H相连</li>
+<li>高速CAN使用闭环总线，CAN_L,CAN_H两端连接两个120Ω的终端电阻（防止回波反射）</li>
+<li>低速CAN使用开环总线CAN_L,CAN_H两端连接两个2.2KΩ的终端电阻</li>
+</ul>
+<h3 id="CAN电平标准"><a href="#CAN电平标准" class="headerlink" title="CAN电平标准"></a>CAN电平标准</h3><ul>
+<li>高速CAN：电压差为0V, 表示逻辑1（隐性电平）<br>    电压差为2V, 表示逻辑0（显性电平）</li>
+<li>低速CAN：电压差为-1.5V, 表示逻辑1（隐性电平）<br>    电压差为3V, 表示逻辑0（显性电平）<br>    （因为低速CAN传输距离远，为了避免传输过程中产生压降，所以将逻辑1和0的电压差距规定更大）</li>
+</ul>
+<h3 id="CAN收发器"><a href="#CAN收发器" class="headerlink" title="CAN收发器"></a>CAN收发器</h3><h3 id="CAN帧格式"><a href="#CAN帧格式" class="headerlink" title="CAN帧格式"></a>CAN帧格式</h3><h4 id="数据帧（发送设备主动发送帧【广播式】）"><a href="#数据帧（发送设备主动发送帧【广播式】）" class="headerlink" title="数据帧（发送设备主动发送帧【广播式】）"></a>数据帧（发送设备主动发送帧【广播式】）</h4><p>数据帧用于从一个节点向其他节点传输数据。其标准帧格式包含以下部分：</p>
+<ol>
+<li><strong>帧起始</strong>：一个单独的“显性”位，用于同步总线上的所有节点。</li>
+<li><strong>仲裁场</strong>：包含11位（标准帧）或29位（扩展帧）的报文标识符（ID）和一个远程发送请求位（RTR，数据帧中RTR为显性0）。ID决定了报文的优先级。</li>
+<li><strong>控制场</strong>：包含6位，其中关键的是4位数据长度码（DLC），用于指示数据场有多少个字节。</li>
+<li><strong>数据场</strong>：0到8个字节，即要发送的实际数据。</li>
+<li><strong>CRC场</strong>：包含16位的CRC校验序列和1位CRC界定符，用于检测数据在传输过程中是否出错。</li>
+<li><strong>应答场</strong>：由2位组成。发送节点在此位时段发送两个隐性位，任何正确接收到报文的节点都可以通过在应答间隙（第一个位）发送一个显性位来覆盖它，以确认接收成功。</li>
+<li><strong>帧结束</strong>：由7位连续的“隐性”位组成，表示数据帧的结束。</li>
+</ol>
+<h4 id="遥控帧（接收设备主动请求数据【请求式】）"><a href="#遥控帧（接收设备主动请求数据【请求式】）" class="headerlink" title="遥控帧（接收设备主动请求数据【请求式】）"></a>遥控帧（接收设备主动请求数据【请求式】）</h4><p>遥控帧的实现需要数据帧的配合：<br>    遥控帧广播自己所请求的设备id，设备id匹配后，再广播一个数据帧，将数据发送出去</p>
+<ul>
+<li>遥控帧与数据帧结构类似，主要区别在于：<ul>
+<li>其RTR位为隐性（1），表示这是一个远程请求。</li>
+<li>遥控帧没有数据场，其DLC指示了请求的数据字节数。</li>
+</ul>
+</li>
+</ul>
+<h4 id="错误帧（某个设备检测到错误时向其他设备发送通知）"><a href="#错误帧（某个设备检测到错误时向其他设备发送通知）" class="headerlink" title="错误帧（某个设备检测到错误时向其他设备发送通知）"></a>错误帧（某个设备检测到错误时向其他设备发送通知）</h4><pre><code>错误标志6位（这里的标志部分是没有填充位的，这样可以将错误、过载和正常数据区分）:
+- 主动错误标志（隐性1）
+- 被动错误标志（显性0）
+</code></pre>
+<h4 id="过载帧（接收设备通知发送设备，表明自己未做好接收准备）"><a href="#过载帧（接收设备通知发送设备，表明自己未做好接收准备）" class="headerlink" title="过载帧（接收设备通知发送设备，表明自己未做好接收准备）"></a>过载帧（接收设备通知发送设备，表明自己未做好接收准备）</h4><p>标志6位（这里的标志部分是没有填充位的，这样可以将错误、过载和正常数据区分）:<br>    - 主动过载标志（隐性1）<br>    - 被动过载标志（显性0）</p>
+<h4 id="帧间隔（用于将数据帧及遥控帧与其他帧区分开来）"><a href="#帧间隔（用于将数据帧及遥控帧与其他帧区分开来）" class="headerlink" title="帧间隔（用于将数据帧及遥控帧与其他帧区分开来）"></a>帧间隔（用于将数据帧及遥控帧与其他帧区分开来）</h4><ul>
+<li>帧间隔用于将前一帧（数据帧或遥控帧）与后一帧分隔开。它至少包含3个连续的“隐性”位。总线空闲期间也认为是帧间隔的一部分。</li>
+</ul>
+<h3 id="位填充"><a href="#位填充" class="headerlink" title="位填充"></a>位填充</h3><p>发送方：每连续5个相同电平后，自动插入1个相反电平的填充位。<br>接收方：每连续5个相同电平后，自动删除接下来的1个相反电平的填充位。<br>只对“帧起始、仲裁场、控制场、数据场、CRC序列”生效，帧结束&#x2F;应答&#x2F;帧间隔不填充。</p>
+<p>实例：</p>
+<p>即将发送：1 0 0 0 0 0 1 1 0</p>
+<p>检测到连续5个0，插入反电平1：<br>实际发送：1 0 0 0 0 0 [1] 1 1 0<br>                      ↑填充位</p>
+<p>接收方收到：1 0 0 0 0 0 [1] 1 1 0<br>连续5个0之后遇到与其相反的那个1，识别为填充位，删除：<br>移除后恢复：1 0 0 0 0 0 1 1 0</p>
+<p><strong>位填充作用：</strong></p>
+<ul>
+<li><strong>增加波形的定时信息，利于接收方执行“再同步”，防止波形长时间无变化，导致接收方不能精确掌握数据采样时机。</strong></li>
+<li><strong>将正常数据流与“错误帧”和“过载帧”区分开，标志“错误帧”和“过载帧”的特性。</strong><br>（CAN 协议定义了一条语法规则：正常帧永远不会出现 6 个连续相同电平——因为位填充会在第 5 个时强制翻转。<br>而错误帧和过载帧，都是故意发送 6 个连续显性位。这种‘连续 6 位相同’在正常帧里永不存在，因此它在物理层上就是一种独特的标志，用来和正常数据流彻底区分开。）</li>
+<li><strong>保持CAN总线在发送正常数据流的活跃状态，防止被误认为总线空闲。连续11位为隐性位，就表示总线处于空闲状态。</strong></li>
+</ul>
+<h3 id="接收方数据采样和位同步"><a href="#接收方数据采样和位同步" class="headerlink" title="接收方数据采样和位同步"></a>接收方数据采样和位同步</h3><ul>
+<li>位时序：对每一个数据位的时长进行更细的划分：同步段SS，传播时间段PTS，相位缓冲段1 PBS1，相位缓冲段2 PBS2<br>使跳变沿出现在SS段，并在PBS1和PBS2之间进行采样</li>
+<li>硬同步：接收方在发送方的第一个下降沿时，将自己的位时序调整到ss段，并在PBS1和PBS2之间进行采样（只在第一个跳变沿进行调整）</li>
+<li>再同步：在之后的每个跳变沿，接收方通过判断自己的时序快于或慢于发送方时序，对时钟进行补偿（SJW） SJW范围：1~4TQ</li>
+</ul>
+<h3 id="仲裁"><a href="#仲裁" class="headerlink" title="仲裁"></a>仲裁</h3><p>仲裁规则：</p>
+<ul>
+<li>先占先得：在一个发送方发送中途，不允许其他发送方发送“数据帧”和“遥控帧”，但是可以发送“错误帧”和“过载帧”</li>
+<li>非破坏性仲裁：针对多个发送方同时发起数据的情况。根据ID号进行优先级判断，ID小的优先级高<br>  前提：<br>  线与特性：<br>  回读机制：发送方发送一位数据后都会进行回读电平，以确认自己发送的电平是否被真实地发送出去了。发送0回读一定是0，发送1回读不一定是1<br>  过程：数据位从前往后依次进行比较，出现差异的数据位，发送数据位为1的仲裁失利<br> 标准数据帧和标准遥控帧的id号一致时，标准数据帧优先级高，因为标准数据帧后面的 位为0，而遥控帧为1<br> 标准数据帧和扩展数据帧前11位id一致时，标准数据帧优先级高，因为扩展数据帧SRR始终为1</li>
+</ul>
+<h3 id="错误处理"><a href="#错误处理" class="headerlink" title="错误处理"></a>错误处理</h3><p>错误类型</p>
+<ul>
+<li>位错误</li>
+<li>填充错误</li>
+<li>CRC错误</li>
+<li>格式错误</li>
+<li>应答错误</li>
+</ul>
+<p>错误状态：</p>
+<ul>
+<li>主动错误状态：发送错误帧，错误标志为隐性1，此时设备能够正常参与通信，并具有发送主动错误帧的能力</li>
+<li>被动错误状态：发送过载帧，错误标志为显性0，此时设备能够正常参与通信，但只具有发送被动错误帧的能力</li>
+<li>总线关闭状态：当一个设备连续发送128个错误帧后，进入总线关闭状态，不再参与总线通信，直到持续检测到128次连续的11个隐性位，才重新进入主动错误状态</li>
+</ul>
+<h3 id="过滤器（以STM32C8T6为例）"><a href="#过滤器（以STM32C8T6为例）" class="headerlink" title="过滤器（以STM32C8T6为例）"></a>过滤器（以STM32C8T6为例）</h3><p>每个过滤器可以配置4种工作模式，每个过滤器有两个32位的寄存器，也就是每个过滤器最多只能存4个标准数据帧</p>
+<ul>
+<li>32位模式&#x2F;16位模式</li>
+<li>屏蔽模式（用于以组为单位进行过滤）&#x2F;列表模式（直接将要过滤的ID写在寄存器中）</li>
+</ul>
+<h3 id="测试模式"><a href="#测试模式" class="headerlink" title="测试模式"></a>测试模式</h3><ul>
+<li>静默模式：用于分析CAN总线的活动，不会对CAN总线造成影响</li>
+<li>环回模式：自发自测</li>
+<li>还回静默模式</li>
+</ul>
+<h3 id="工作模式"><a href="#工作模式" class="headerlink" title="工作模式"></a>工作模式</h3><ul>
+<li>初始化模式</li>
+<li>正常模式</li>
+<li>睡眠模式</li>
+<li>AWUM模式</li>
+</ul>
+<h2 id="ModBus协议（应用层协议）"><a href="#ModBus协议（应用层协议）" class="headerlink" title="ModBus协议（应用层协议）"></a>ModBus协议（应用层协议）</h2><h3 id="及与串口的ModBus协议"><a href="#及与串口的ModBus协议" class="headerlink" title="及与串口的ModBus协议"></a>及与串口的ModBus协议</h3><p>Modbus是一种应用层协议，通常基于串口（RS-232&#x2F;485）或以太网（TCP&#x2F;IP）实现。它定义了一个与物理层无关的消息结构，采用主从通信模式。</p>
+<h4 id="RTU-远程终端单元"><a href="#RTU-远程终端单元" class="headerlink" title="RTU (远程终端单元)"></a>RTU (远程终端单元)</h4><ul>
+<li><strong>特点</strong>：使用二进制数据，采用CRC校验，消息帧无起始&#x2F;结束字符，通过“空闲时间”来分隔帧。效率高。</li>
+<li><strong>存储区</strong>：<ul>
+<li>线圈寄存器（只有一位， 可读可写）</li>
+<li>离散输入寄存器（只有一位， 只可读）</li>
+<li>保持寄存器（16位， 可读可写）</li>
+<li>输入寄存器（16位， 只可读）</li>
+</ul>
+</li>
+<li><strong>报文格式</strong>：<code>[设备地址] [功能码] [数据] [CRC校验]</code>。帧与帧之间需要间隔至少3.5个字符传输时间。</li>
+</ul>
+<h4 id="ASCII"><a href="#ASCII" class="headerlink" title="ASCII"></a>ASCII</h4><p><strong>报文格式</strong></p>
+<ul>
+<li>使用ASCII字符表示数据，采用LRC校验，消息帧以冒号<code>:</code>开头，以回车换行<code>\r\n</code>结尾。效率较低，但易于调试和阅读。</li>
+</ul>
+<h3 id="基于以太网的"><a href="#基于以太网的" class="headerlink" title="基于以太网的"></a>基于以太网的</h3><h4 id="TCP"><a href="#TCP" class="headerlink" title="TCP"></a>TCP</h4><p><strong>报文格式</strong></p>
+<ul>
+<li>ModeBus TCP是基于TCP&#x2F;IP实现的，是一个应用层协议，由于在以太网中的链路层已经经过了校验，所以在这里不需要结尾的CRC校验。</li>
+<li>这里的单元标识符实际上没有用到，因为使用IP进行寻址。但是这里要保留这个字段，用于在ModBus TCP的从机下又挂载了ModBus RTU的情况中。</li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://troyeeee673.github.io/2026/06/08/%E7%94%B5%E8%B7%AF/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1392,7 +1631,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">14</span>
+          <span class="site-state-item-count">15</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
