@@ -188,6 +188,218 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://troyeeee673.github.io/2026/06/10/%E7%AC%AC%E5%9B%9B%E7%AB%A0%E3%80%81%E5%B9%B6%E5%8F%91%E4%BF%A1%E5%8F%B7%E4%B8%8E%E7%BA%BF%E7%A8%8B/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/troye.jpg">
+      <meta itemprop="name" content="Huiting_Yang">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Linux系统编程">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2026/06/10/%E7%AC%AC%E5%9B%9B%E7%AB%A0%E3%80%81%E5%B9%B6%E5%8F%91%E4%BF%A1%E5%8F%B7%E4%B8%8E%E7%BA%BF%E7%A8%8B/" class="post-title-link" itemprop="url">第四章、并发信号与线程</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-06-10 17:20:56" itemprop="dateCreated datePublished" datetime="2026-06-10T17:20:56+08:00">2026-06-10</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-06-11 15:04:17" itemprop="dateModified" datetime="2026-06-11T15:04:17+08:00">2026-06-11</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux%E7%B3%BB%E7%BB%9F%E7%BC%96%E7%A8%8B/" itemprop="url" rel="index"><span itemprop="name">Linux系统编程</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h1 id="系统编程：并发、信号与-POSIX-线程"><a href="#系统编程：并发、信号与-POSIX-线程" class="headerlink" title="系统编程：并发、信号与 POSIX 线程"></a>系统编程：并发、信号与 POSIX 线程</h1><p>本章分为两条主线：信号机制和线程并发。前者解决异步事件通知，后者解决同一进程内的并行执行和资源共享。</p>
+<h2 id="一、并发的两种入口"><a href="#一、并发的两种入口" class="headerlink" title="一、并发的两种入口"></a>一、并发的两种入口</h2><p>系统编程中的并发并不只等于“多线程”。第 4 章把并发拆成两个角度：</p>
+<ul>
+<li>信号：内核或其他进程向当前进程发送异步事件。</li>
+<li>线程：同一进程内创建多个执行流，共享地址空间。</li>
+</ul>
+<p>信号强调“异步打断”，线程强调“同时执行”。它们都会引入状态一致性、资源释放和同步问题。</p>
+<h2 id="二、信号概念"><a href="#二、信号概念" class="headerlink" title="二、信号概念"></a>二、信号概念</h2><p>信号是 Unix&#x2F;Linux 中非常经典的异步通知机制。常见信号包括：</p>
+<ul>
+<li><code>SIGINT</code>：终端中按 <code>Ctrl+C</code>。</li>
+<li><code>SIGTERM</code>：请求进程终止。</li>
+<li><code>SIGKILL</code>：强制杀死，不能捕获、不能忽略。</li>
+<li><code>SIGSEGV</code>：非法内存访问。</li>
+<li><code>SIGCHLD</code>：子进程状态变化。</li>
+<li><code>SIGALRM</code>：定时器超时。</li>
+</ul>
+<p>信号的不可靠性、可重入函数、响应过程、信号集、信号屏蔽字和 pending 集，这些是学习信号时最关键的概念。</p>
+<h2 id="三、signal-与处理函数"><a href="#三、signal-与处理函数" class="headerlink" title="三、signal() 与处理函数"></a>三、<code>signal()</code> 与处理函数</h2><p>简单信号处理可以使用：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> (*signal(<span class="type">int</span> signum, <span class="type">void</span> (*handler)(<span class="type">int</span>)))(<span class="type">int</span>);</span><br></pre></td></tr></table></figure>
+
+<p>但在工程实践中，更推荐 <code>sigaction()</code>，因为它语义更清晰，也能设置更多行为。</p>
+<p>信号处理函数要尽量短小，只做异步信号安全的事情。常见做法是在 handler 中设置一个 <code>volatile sig_atomic_t</code> 标志位，让主循环自己处理复杂逻辑。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="keyword">volatile</span> <span class="type">sig_atomic_t</span> stop = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">on_sigint</span><span class="params">(<span class="type">int</span> signo)</span></span><br><span class="line">&#123;</span><br><span class="line">    stop = <span class="number">1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>不要在信号处理函数中随意调用 <code>printf()</code>、<code>malloc()</code>、<code>pthread_mutex_lock()</code> 等函数，它们可能不是异步信号安全的。</p>
+<h2 id="四、信号为什么“不可靠”"><a href="#四、信号为什么“不可靠”" class="headerlink" title="四、信号为什么“不可靠”"></a>四、信号为什么“不可靠”</h2><p>“信号的不可靠：行为不可靠”。这里可以从两个层面理解：</p>
+<ul>
+<li>传统信号可能不排队，同类信号多次到达可能只记录一次。</li>
+<li>信号会异步打断当前执行流，如果处理函数做了不安全操作，容易造成状态混乱。</li>
+</ul>
+<p>实时信号改善了排队问题。原笔记中也提到：实时信号响应排队、有顺序、不丢失。</p>
+<h2 id="五、信号集、屏蔽字和-pending-集"><a href="#五、信号集、屏蔽字和-pending-集" class="headerlink" title="五、信号集、屏蔽字和 pending 集"></a>五、信号集、屏蔽字和 pending 集</h2><p>信号集操作：</p>
+<ul>
+<li><code>sigemptyset()</code>：初始化为空信号集。</li>
+<li><code>sigfillset()</code>：初始化为包含所有信号。</li>
+<li><code>sigaddset()</code>：加入一个信号。</li>
+<li><code>sigdelset()</code>：删除一个信号。</li>
+<li><code>sigismember()</code>：判断信号是否在集合中。</li>
+</ul>
+<p>屏蔽信号使用：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">sigprocmask</span><span class="params">(<span class="type">int</span> how, <span class="type">const</span> <span class="type">sigset_t</span> *<span class="built_in">set</span>, <span class="type">sigset_t</span> *oldset)</span>;</span><br></pre></td></tr></table></figure>
+
+<p>查询未决信号：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">sigpending</span><span class="params">(<span class="type">sigset_t</span> *<span class="built_in">set</span>)</span>;</span><br></pre></td></tr></table></figure>
+<p>宏观编程思想：当对信号集进行了修改时，程序结束前应恢复到初始状态，否则可能影响后续模块的正常运行。</p>
+<h2 id="六、常用信号相关函数"><a href="#六、常用信号相关函数" class="headerlink" title="六、常用信号相关函数"></a>六、常用信号相关函数</h2><p>扩展方向包括：</p>
+<ul>
+<li><code>sigsuspend()</code>：临时替换信号屏蔽字并挂起等待信号。</li>
+<li><code>sigaction()</code>：比 <code>signal()</code> 更可靠地设置信号处理行为。</li>
+<li><code>alarm()</code>、<code>pause()</code>、<code>kill()</code>、<code>raise()</code>。</li>
+<li><code>abort()</code>：触发异常终止，不会执行 <code>atexit()</code> 注册函数。</li>
+<li><code>sleep()</code>、<code>nanosleep()</code>、<code>usleep()</code>、<code>select()</code>。</li>
+</ul>
+<p><code>select()</code> 可以被用作休眠，这是它的副作用之一。但如果目标只是高精度休眠，更清晰的选择是 <code>nanosleep()</code>。</p>
+<h2 id="七、线程概念"><a href="#七、线程概念" class="headerlink" title="七、线程概念"></a>七、线程概念</h2><p>对线程的理解：一个正在运行的函数，多个线程之间是兄弟关系。POSIX 线程是一套标准，不是某个具体实现。</p>
+<p>线程标识类型是：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">pthread_t</span></span><br></pre></td></tr></table></figure>
+
+<p>不要假设它就是 <code>int</code>。比较线程 ID 应使用：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">pthread_equal();</span><br></pre></td></tr></table></figure>
+
+<p>获取当前线程 ID：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">pthread_self();</span><br></pre></td></tr></table></figure>
+
+<h2 id="八、线程创建、终止和回收"><a href="#八、线程创建、终止和回收" class="headerlink" title="八、线程创建、终止和回收"></a>八、线程创建、终止和回收</h2><p>创建线程：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">pthread_create();</span><br></pre></td></tr></table></figure>
+
+<p>线程终止方式包括：</p>
+<ul>
+<li>线程启动例程返回。</li>
+<li>被同进程内其他线程取消。</li>
+<li>调用 <code>pthread_exit()</code>。</li>
+<li><code>main</code> 线程从 <code>main()</code> 返回。</li>
+<li>任意线程调用 <code>exit()</code>，导致整个进程退出。</li>
+</ul>
+<p>回收线程：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">pthread_join(tid, &amp;retval);</span><br></pre></td></tr></table></figure>
+
+<p>它在线程世界中的地位类似进程中的 <code>wait()</code>。</p>
+<p>线程分离：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">pthread_detach(tid);</span><br></pre></td></tr></table></figure>
+
+<p>一旦线程被分离，就不能再 <code>join</code>，资源由线程库自动回收。适合不关心返回值的后台任务。</p>
+<h2 id="九、线程取消和清理"><a href="#九、线程取消和清理" class="headerlink" title="九、线程取消和清理"></a>九、线程取消和清理</h2><p>线程取消相关函数：</p>
+<ul>
+<li><code>pthread_cancel()</code>：请求取消线程。</li>
+<li><code>pthread_setcancelstate()</code>：设置是否允许取消。</li>
+<li><code>pthread_setcanceltype()</code>：设置取消方式。</li>
+<li><code>pthread_testcancel()</code>：人为设置取消点。</li>
+</ul>
+<p>默认通常是推迟取消，也就是线程运行到取消点才响应。取消点通常是可能阻塞的系统调用。</p>
+<p>清理函数成对出现：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">pthread_cleanup_push();</span><br><span class="line">pthread_cleanup_pop(<span class="number">0</span>或<span class="number">1</span>);</span><br></pre></td></tr></table></figure>
+
+<p>它们常用于保证线程被取消时能释放锁、关闭文件、释放内存。</p>
+<h2 id="十、线程同步"><a href="#十、线程同步" class="headerlink" title="十、线程同步"></a>十、线程同步</h2><p>下面列出几类同步机制。</p>
+<h3 id="互斥量"><a href="#互斥量" class="headerlink" title="互斥量"></a>互斥量</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">pthread_mutex_t</span></span><br><span class="line"><span class="title function_">pthread_mutex_init</span><span class="params">()</span></span><br><span class="line"><span class="title function_">pthread_mutex_destroy</span><span class="params">()</span></span><br><span class="line"><span class="title function_">pthread_mutex_lock</span><span class="params">()</span></span><br><span class="line"><span class="title function_">pthread_mutex_trylock</span><span class="params">()</span></span><br><span class="line"><span class="title function_">pthread_mutex_unlock</span><span class="params">()</span></span><br><span class="line"><span class="title function_">pthread_once</span><span class="params">()</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>注意</strong>：在临界区内执行 <code>goto</code>、<code>setjmp</code>、<code>break</code>、<code>continue</code>、函数调用等跳转前，必须保证先解锁，否则可能造成死锁。</p>
+<h3 id="条件变量"><a href="#条件变量" class="headerlink" title="条件变量"></a>条件变量</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">pthread_cond_t</span></span><br><span class="line"><span class="title function_">pthread_cond_init</span><span class="params">()</span></span><br><span class="line"><span class="title function_">pthread_cond_destroy</span><span class="params">()</span></span><br><span class="line"><span class="title function_">pthread_cond_signal</span><span class="params">()</span></span><br><span class="line"><span class="title function_">pthread_cond_broadcast</span><span class="params">()</span></span><br><span class="line"><span class="title function_">pthread_cond_wait</span><span class="params">()</span></span><br><span class="line"><span class="title function_">pthread_cond_timedwait</span><span class="params">()</span></span><br></pre></td></tr></table></figure>
+
+<p>条件变量通常和互斥量配合使用。<code>pthread_cond_wait()</code> 内部会原子地释放互斥量并进入等待，醒来后重新加锁。</p>
+<h3 id="信号量与读写锁"><a href="#信号量与读写锁" class="headerlink" title="信号量与读写锁"></a>信号量与读写锁</h3><p>总结：</p>
+<ul>
+<li>信号量适合多个同类资源的计数管理。</li>
+<li>读写锁用于规避写者饥饿问题。</li>
+<li>读锁共享，写锁互斥。</li>
+</ul>
+<p>读多写少场景中，读写锁能比普通互斥量提供更好的并发度。</p>
+<h2 id="十一、线程属性与同步属性"><a href="#十一、线程属性与同步属性" class="headerlink" title="十一、线程属性与同步属性"></a>十一、线程属性与同步属性</h2><p>线程属性：</p>
+<ul>
+<li><code>pthread_attr_init()</code></li>
+<li><code>pthread_attr_destroy()</code></li>
+<li><code>pthread_attr_setstacksize()</code></li>
+</ul>
+<p>同步属性：</p>
+<ul>
+<li><code>pthread_mutexattr_t</code></li>
+<li><code>pthread_mutexattr_setpshared()</code>：设置互斥量是否跨进程起作用。</li>
+<li><code>pthread_mutexattr_settype()</code>：设置互斥量类型。</li>
+</ul>
+<p>互斥量类型包括：</p>
+<ul>
+<li><code>PTHREAD_MUTEX_NORMAL</code></li>
+<li><code>PTHREAD_MUTEX_ERRORCHECK</code></li>
+<li><code>PTHREAD_MUTEX_RECURSIVE</code></li>
+<li><code>PTHREAD_MUTEX_DEFAULT</code></li>
+</ul>
+<h2 id="十二、线程、信号与-fork"><a href="#十二、线程、信号与-fork" class="headerlink" title="十二、线程、信号与 fork"></a>十二、线程、信号与 fork</h2><p>在多线程进程中调用 <code>fork()</code> 时，POSIX 采用 Fork-One 模型，子进程只复制调用 <code>fork()</code> 的那个线程，而不是复制父进程的全部线程。</p>
+<p>这能避免复制所有线程带来的复杂状态，但也引出一个风险：如果其他线程持有锁，而子进程只复制了当前线程，那么子进程中这个锁可能永远无法释放。因此多线程程序中 <code>fork()</code> 后通常应尽快 <code>exec()</code>。</p>
+<h2 id="十三、线程数量限制"><a href="#十三、线程数量限制" class="headerlink" title="十三、线程数量限制"></a>十三、线程数量限制</h2><p>线程数量和栈空间的关系：</p>
+<ul>
+<li>32 位机器用户空间有限，默认线程栈可能导致可创建线程数较少。</li>
+<li>64 位机器虚拟地址空间大得多，线程数通常受 PID、物理内存、内核数据结构和系统参数限制。</li>
+<li>默认线程栈常见为 8MB，可通过线程属性调整。</li>
+</ul>
+<p>这说明线程不是越多越好。高并发服务更常见的做法是线程池、事件循环或二者结合。</p>
+<h2 id="十四、任务练习"><a href="#十四、任务练习" class="headerlink" title="十四、任务练习"></a>十四、任务练习</h2><p><strong>源码地址</strong>：<a target="_blank" rel="noopener" href="https://github.com/troyeeee673/Linux-/tree/main/%E7%AC%AC%E5%9B%9B%E7%AB%A0%E5%B9%B6%E5%8F%91%E4%BF%A1%E5%8F%B7%E4%B8%8E%E7%BA%BF%E7%A8%8B">https://github.com/troyeeee673/Linux-/tree/main/%E7%AC%AC%E5%9B%9B%E7%AB%A0%E5%B9%B6%E5%8F%91%E4%BF%A1%E5%8F%B7%E4%B8%8E%E7%BA%BF%E7%A8%8B</a></p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>信号和线程都属于并发，但它们解决的问题不同。信号适合异步通知，线程适合并行执行。学习这一章时，要重点关注三个问题：异步场景下哪些函数安全、共享资源如何同步、异常退出时资源如何释放。把这些问题想清楚，才能写出稳定的系统程序。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://troyeeee673.github.io/2026/06/08/%E5%B5%8C%E5%85%A5%E5%BC%8F%E9%80%9A%E4%BF%A1%E5%B8%B8%E8%A7%81%E5%8D%8F%E8%AE%AE/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1631,7 +1843,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">15</span>
+          <span class="site-state-item-count">16</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
