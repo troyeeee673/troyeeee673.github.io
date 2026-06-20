@@ -188,6 +188,314 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://troyeeee673.github.io/2026/06/20/IMX6U%E4%B9%8BI2C/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/troye.jpg">
+      <meta itemprop="name" content="Huiting_Yang">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Linux系统编程">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2026/06/20/IMX6U%E4%B9%8BI2C/" class="post-title-link" itemprop="url">IMX6U之I2C</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-06-20 15:52:03 / 修改时间：15:53:19" itemprop="dateCreated datePublished" datetime="2026-06-20T15:52:03+08:00">2026-06-20</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux%E8%A3%B8%E6%9C%BA%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/" itemprop="url" rel="index"><span itemprop="name">Linux裸机驱动开发</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h1 id="IMX6ULL-的-I²C-通信与-AP3216C-环境光传感器实践"><a href="#IMX6ULL-的-I²C-通信与-AP3216C-环境光传感器实践" class="headerlink" title="IMX6ULL 的 I²C 通信与 AP3216C 环境光传感器实践"></a>IMX6ULL 的 I²C 通信与 AP3216C 环境光传感器实践</h1><p>I²C 是嵌入式开发中最常用的总线之一。本文以 ALPHA 开发板上的 <strong>AP3216C</strong> 环境光传感器为例，从 I²C 协议本身出发，再到 IMX6ULL 的 I²C 控制器配置，最后补充一个实际编程中容易踩的坑，形成一个完整的驱动开发记录。</p>
+<h2 id="一、I²C-协议"><a href="#一、I²C-协议" class="headerlink" title="一、I²C 协议"></a>一、I²C 协议</h2><h3 id="1-1-硬件基础"><a href="#1-1-硬件基础" class="headerlink" title="1.1 硬件基础"></a>1.1 硬件基础</h3><p>I²C 总线只需要两根线：<strong>SCL</strong>（串行时钟）和 <strong>SDA</strong>（串行数据）。这两条线必须通过上拉电阻拉到 VCC（通常是 4.7KΩ 拉到 3.3V），以保证总线空闲时电平稳定。一条 I²C 总线上可以挂载多个从机，通信时通过<strong>从机地址</strong>来区分目标设备。</p>
+<p>在 ALPHA 开发板上，AP3216C 连接到了 <strong>I2C1</strong> 接口，引脚复用情况如下：</p>
+<table>
+<thead>
+<tr>
+<th align="left">I²C 信号</th>
+<th align="left">功能</th>
+<th align="left">IMX6ULL 引脚</th>
+<th align="left">复用模式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">SCL</td>
+<td align="left">串行时钟</td>
+<td align="left">UART4_TXD</td>
+<td align="left">ALT2</td>
+</tr>
+<tr>
+<td align="left">SDA</td>
+<td align="left">串行数据</td>
+<td align="left">UART4_RXD</td>
+<td align="left">ALT2</td>
+</tr>
+</tbody></table>
+<h3 id="1-2-一次完整的数据读取流程"><a href="#1-2-一次完整的数据读取流程" class="headerlink" title="1.2 一次完整的数据读取流程"></a>1.2 一次完整的数据读取流程</h3><p>I²C 通信以 <strong>START</strong> 信号开始，以 <strong>STOP</strong> 信号结束。以从 AP3216C 的某个寄存器读取数据为例，完整的过程可拆解为以下步骤：</p>
+<ol>
+<li><strong>主机</strong>发送<strong>起始信号（START）</strong>，占据总线。</li>
+<li><strong>主机</strong>发送<strong>从设备地址 + 写控制位</strong>，告诉总线要和谁通信、接下来要做什么。</li>
+<li><strong>从机</strong>回应一个 <strong>ACK 应答信号</strong>，表示“我在，收到”。</li>
+<li><strong>主机</strong>发送目标<strong>寄存器地址</strong>，告诉从机要读哪个位置的数据。</li>
+<li><strong>从机</strong>再次回应 <strong>ACK</strong>。</li>
+<li><strong>主机</strong>再次发送<strong>起始信号（Repeated START）</strong>。</li>
+<li><strong>主机</strong>再次发送<strong>从设备地址 + 读控制位</strong>，切换为读模式。</li>
+<li><strong>从机</strong>回应 <strong>ACK</strong>。</li>
+<li><strong>从机</strong>将目标寄存器的数据发送到总线上。</li>
+<li><strong>主机</strong>收到数据后，发出 <strong>NO ACK 信号</strong>，表示“读取完成，不用再发了”。</li>
+<li><strong>主机</strong>发送<strong>停止信号（STOP）</strong>，释放总线。</li>
+</ol>
+<p>可以看出，I²C 读操作的精髓在于<strong>先写后读</strong>——先通过“写”动作告诉从机想读的寄存器地址，再通过“读”动作获取数据。</p>
+<h2 id="二、IMX6ULL-I²C-控制器核心配置"><a href="#二、IMX6ULL-I²C-控制器核心配置" class="headerlink" title="二、IMX6ULL I²C 控制器核心配置"></a>二、IMX6ULL I²C 控制器核心配置</h2><p>IMX6ULL 的 I²C 外设支持标准模式（100kbit&#x2F;s）和快速模式（400kbit&#x2F;s），开发时主要涉及以下几个关键寄存器。</p>
+<h3 id="2-1-时钟与波特率"><a href="#2-1-时钟与波特率" class="headerlink" title="2.1 时钟与波特率"></a>2.1 时钟与波特率</h3><ul>
+<li><strong>时钟源</strong>：I²C 模块的根时钟来自 <code>perclk_clk_root</code>，也就是 <code>ipg_clk_root</code>，频率为 <strong>66MHz</strong>。</li>
+<li><strong>分频设置</strong>：通过 <strong>IFDR</strong> 寄存器的低 6 位设置分频系数。以 100kbit&#x2F;s 的目标速率为例，计算过程如下：<ul>
+<li>所需分频值 &#x3D; 66000000 &#x2F; 100000 &#x3D; <strong>660</strong>。</li>
+<li>查阅参考手册，当 IFDR 设为 <code>0x38</code> 或 <code>0x15</code> 时，对应 640 分频。</li>
+<li>实际速率 &#x3D; 66000000 &#x2F; 640 ≈ <strong>103.125kbit&#x2F;s</strong>，误差在可接受范围内。</li>
+</ul>
+</li>
+</ul>
+<h3 id="2-2-控制与状态寄存器"><a href="#2-2-控制与状态寄存器" class="headerlink" title="2.2 控制与状态寄存器"></a>2.2 控制与状态寄存器</h3><ul>
+<li><strong>I2CR（控制寄存器）</strong>：<ul>
+<li><code>bit7</code>：I²C 使能位，置 1 开启模块。</li>
+<li><code>bit5</code>：主从模式选择，置 1 为主机模式。</li>
+<li><code>bit4</code>：收发控制，置 1 为发送，置 0 为接收。</li>
+</ul>
+</li>
+<li><strong>I2SR（状态寄存器）</strong>：<ul>
+<li><code>bit7</code>：传输完成标志，1 表示本次传输已完成。</li>
+<li><code>bit5</code>：总线忙闲标志，0 表示空闲，1 表示忙。</li>
+<li><code>bit0</code>：ACK 接收位，用于判断从机是否应答。</li>
+</ul>
+</li>
+<li><strong>I2DR（数据寄存器）</strong>：收发数据的直接窗口，要发送的数据写入这里，接收到的数据也从这里读出。</li>
+</ul>
+<h2 id="三、实际编程中的一个坑：浮点运算卡死"><a href="#三、实际编程中的一个坑：浮点运算卡死" class="headerlink" title="三、实际编程中的一个坑：浮点运算卡死"></a>三、实际编程中的一个坑：浮点运算卡死</h2><p>在调试过程中，我遇到一个容易忽视的问题：程序一运行到浮点计算就直接卡死。</p>
+<h3 id="问题原因"><a href="#问题原因" class="headerlink" title="问题原因"></a>问题原因</h3><p>IMX6ULL 内部集成了硬件浮点运算单元（FPU），但在裸机或某些轻量级 RTOS 环境下，需要手动开启，并在编译时正确指定浮点 ABI，否则处理器执行到浮点指令会触发未定义指令异常。</p>
+<h3 id="解决方法"><a href="#解决方法" class="headerlink" title="解决方法"></a>解决方法</h3><p>两步走：</p>
+<ol>
+<li><strong>硬件层面</strong>：在启动代码中，确保 CPACR（协处理器访问控制寄存器）的 <code>CP10</code> 和 <code>CP11</code> 位已置 1，使能 FPU。</li>
+<li><strong>编译层面</strong>：在 Makefile 或 IDE 的编译选项中，添加硬件浮点支持，例如 <code>-mfloat-abi=hard</code>。</li>
+</ol>
+<p>做完这两步后，浮点运算便恢复正常。</p>
+<hr>
+<p>从 I²C 协议到 IMX6ULL 控制器配置，再到 AP3216C 传感器的访问流程，这些内容串起来就是一个典型的 I²C 外设驱动开发闭环。配合那个浮点运算的小坑记录，希望这篇笔记对你有所帮助。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://troyeeee673.github.io/2026/06/20/IMX6U%E4%B9%8BSPI/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/troye.jpg">
+      <meta itemprop="name" content="Huiting_Yang">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Linux系统编程">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2026/06/20/IMX6U%E4%B9%8BSPI/" class="post-title-link" itemprop="url">IMX6U之SPI</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-06-20 15:51:58 / 修改时间：15:53:34" itemprop="dateCreated datePublished" datetime="2026-06-20T15:51:58+08:00">2026-06-20</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux%E8%A3%B8%E6%9C%BA%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/" itemprop="url" rel="index"><span itemprop="name">Linux裸机驱动开发</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h1 id="IMX6ULL-的-SPI-总线与-ICM-20608-六轴传感器"><a href="#IMX6ULL-的-SPI-总线与-ICM-20608-六轴传感器" class="headerlink" title="IMX6ULL 的 SPI 总线与 ICM-20608 六轴传感器"></a>IMX6ULL 的 SPI 总线与 ICM-20608 六轴传感器</h1><p>SPI 是嵌入式开发中另一条与 I²C 齐名的常用总线。本篇笔记将先梳理 SPI 协议本身及 IMX6ULL 的 ECSPI 控制器特点，再结合板载的 ICM-20608 六轴传感器，记录从协议到外设驱动的完整思路。</p>
+<h2 id="一、SPI-协议"><a href="#一、SPI-协议" class="headerlink" title="一、SPI 协议"></a>一、SPI 协议</h2><p>比起 I²C，SPI 有两大突出优势：<strong>速度快</strong>（可达几十甚至上百 MHz）和<strong>全双工</strong>。它同样支持一个接口挂载多个外设，但选通方式不是靠地址，而是靠独立的<strong>片选信号（CS）</strong>——通信前拉低对应外设的 CS 引脚即可。</p>
+<ul>
+<li><strong>工作模式</strong>：由 CPOL（时钟极性）和 CPHA（时钟相位）组合出四种模式，实际最常用的是 <strong>CPOL&#x3D;0, CPHA&#x3D;0</strong>（即 Mode 0）。</li>
+<li><strong>硬件连接</strong>：我使用的 ALPHA 开发板上，是通过 <strong>ECSPI3</strong> 连接了一块六轴传感器，具体引脚对应关系如下：</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th align="left">ECSPI3 信号</th>
+<th align="left">功能</th>
+<th align="left">对应 IMX6ULL 引脚</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">SCLK</td>
+<td align="left">串行时钟</td>
+<td align="left">UART2_RX</td>
+</tr>
+<tr>
+<td align="left">MOSI</td>
+<td align="left">主出从入</td>
+<td align="left">UART2_CTS</td>
+</tr>
+<tr>
+<td align="left">MISO</td>
+<td align="left">主入从出</td>
+<td align="left">UART2_RTS</td>
+</tr>
+<tr>
+<td align="left">SS0</td>
+<td align="left">硬件片选0</td>
+<td align="left">UART2_TXD</td>
+</tr>
+</tbody></table>
+<p>IMX6ULL 的一个 SPI 主接口最多可提供 4 个硬件片选（SS0~SS3）。</p>
+<h2 id="二、IMX6ULL-的-ECSPI-控制器"><a href="#二、IMX6ULL-的-ECSPI-控制器" class="headerlink" title="二、IMX6ULL 的 ECSPI 控制器"></a>二、IMX6ULL 的 ECSPI 控制器</h2><p>IMX6ULL 的 SPI 外设全称是 ECSPI（Enhanced Configurable SPI），支持全双工、主从模式可配。下面是与驱动开发直接相关的几个核心寄存器。</p>
+<h3 id="2-1-控制与配置寄存器"><a href="#2-1-控制与配置寄存器" class="headerlink" title="2.1 控制与配置寄存器"></a>2.1 控制与配置寄存器</h3><ul>
+<li><p><strong>CONREG</strong>：主控制寄存器。</p>
+<ul>
+<li><code>bit0</code>：SPI 使能位，置 1 开启模块。</li>
+<li><code>bit3</code>：突发访问控制，置 1 表示一旦向 TXFIFO 写数据，立刻启动发送。</li>
+<li><code>bit7:4</code>：通道主从模式配置，我们用的通道 0（SS0），需将 <code>bit4</code> 置 1，设为主模式。</li>
+<li><code>bit19:18</code>：当前通信通道选择，设为 <code>00</code>，即通道 0。</li>
+<li><code>bit31:30</code>：突发访问数据长度，设为 <code>7</code>，对应 8 位（1 字节）传输。</li>
+</ul>
+</li>
+<li><p><strong>CONFIGREG</strong>：具体时序与特性配置。</p>
+<ul>
+<li><code>bit0 (PHA)</code>：设为 0，在第一个时钟边沿采样数据。</li>
+<li><code>bit4 (POL)</code>：设为 0，空闲时 SCLK 为低电平。</li>
+<li><code>bit16</code>：设为 0，空闲时数据线保持高电平。</li>
+<li><code>bit20</code>：设为 0，空闲时 SCLK 为低电平。</li>
+</ul>
+</li>
+</ul>
+<h3 id="2-2-状态与周期寄存器"><a href="#2-2-状态与周期寄存器" class="headerlink" title="2.2 状态与周期寄存器"></a>2.2 状态与周期寄存器</h3><ul>
+<li><p><strong>STATREG</strong>：状态寄存器，流程控制全靠它。</p>
+<ul>
+<li><code>bit0</code>：TXFIFO 空标志，<strong>发送前</strong>必须等待此位为 1。</li>
+<li><code>bit3</code>：RXFIFO 就绪标志，<strong>接收前</strong>必须等待此位为 1。</li>
+</ul>
+</li>
+<li><p><strong>PERIODREG</strong>：传输时序控制。</p>
+<ul>
+<li><code>bit14:0</code>：片选建立后的等待时间，设为 <code>0x2000</code>。</li>
+<li><code>bit15</code>：等待时钟源选择，设为 0，选 SPI 时钟。</li>
+<li><code>bit21:16</code>：硬件片选延时，可设 0~63，我们使用<strong>软件片选</strong>，故直接设为 0。</li>
+</ul>
+</li>
+</ul>
+<h3 id="2-3-时钟树配置"><a href="#2-3-时钟树配置" class="headerlink" title="2.3 时钟树配置"></a>2.3 时钟树配置</h3><p>这是决定 SPI 通信速率的关键，时钟链路需要逐级来看：</p>
+<ol>
+<li><p><strong>时钟源</strong>：来自 <code>pll3_sw_clk = 480MHz / 8 = 60MHz</code>。需确认 <code>CSCDR2</code> 寄存器的 <code>bit18</code> 为 0，选择此时钟源；<code>bit24:19</code> 设为 0，一级分频系数为 1。因此，进入 ECSPI 模块的根时钟是 <strong>60MHz</strong>。</p>
+</li>
+<li><p><strong>模块内部分频</strong>：在 <code>ECSPI_CONREG</code> 寄存器中还有两级分频：</p>
+<ul>
+<li><strong>前级分频</strong>：<code>bit15:12</code>，可配置 1~16 分频。</li>
+<li><strong>后级分频</strong>：<code>bit11:8</code>，按 2^n 分频，n&#x3D;0~15。</li>
+</ul>
+</li>
+</ol>
+<p>最终的 SCK 时钟频率就是由这个公式决定的，我们可以根据需要灵活计算。</p>
+<h2 id="三、ICM-20608-六轴传感器"><a href="#三、ICM-20608-六轴传感器" class="headerlink" title="三、ICM-20608 六轴传感器"></a>三、ICM-20608 六轴传感器</h2><p>板载的六轴传感器是 ICM-20608，它内部集成了三轴陀螺仪和三轴加速度计。</p>
+<h3 id="3-1-核心特性"><a href="#3-1-核心特性" class="headerlink" title="3.1 核心特性"></a>3.1 核心特性</h3><ul>
+<li><strong>两个 16 位 ADC</strong>，分别处理陀螺仪和加速度计数据，分辨率可配置。</li>
+<li><strong>双接口</strong>：支持 I²C（最高 400kHz）和 <strong>SPI（最高 8MHz）</strong>，我们在这里使用 SPI 通信。</li>
+<li><strong>身份识别</strong>：<strong>WHO_AM_I（0x75）</strong> 寄存器，读取默认值通常为 <code>0xAF</code>（注意：ICM-20608D 型号可能为 <code>0xAE</code>），这是验证通信是否正常的首选手段。</li>
+<li><strong>数据读取</strong>：核心的传感器数据存储在一段连续的地址空间 <strong>0x3B ~ 0x48</strong> 内，只需依次读出，即可解算出三轴加速度和三轴角速度的实时值。</li>
+</ul>
+<h3 id="3-2-驱动开发要点"><a href="#3-2-驱动开发要点" class="headerlink" title="3.2 驱动开发要点"></a>3.2 驱动开发要点</h3><p>在裸机或 Linux 下驱动这个传感器，核心流程可概括为：</p>
+<ol>
+<li><strong>初始化 ECSPI3</strong>，按照上文配置好时钟、模式和片选。</li>
+<li><strong>读取 WHO_AM_I</strong> 寄存器，确认设备存在且通信无误。</li>
+<li><strong>配置传感器</strong>的工作模式、量程及采样率。</li>
+<li>在主循环中<strong>批量读取 0x3B~0x48</strong> 的原始数据，再根据量程换算成实际的物理量。</li>
+</ol>
+<hr>
+<p>从 SPI 协议、IMX6ULL 控制器特性，到 ICM-20608 传感器，这三部分串下来，就是一个标准 SPI 外设驱动的开发全流程。希望这份整理对你理解 IMX6ULL 的 SPI 通信有所帮助。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://troyeeee673.github.io/2026/06/18/IMX6U%E4%B9%8BDDR/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -387,10 +695,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2026-06-17 08:28:19 / 修改时间：08:40:35" itemprop="dateCreated datePublished" datetime="2026-06-17T08:28:19+08:00">2026-06-17</time>
+              <time title="创建时间：2026-06-17 08:28:19" itemprop="dateCreated datePublished" datetime="2026-06-17T08:28:19+08:00">2026-06-17</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-06-20 15:52:34" itemprop="dateModified" datetime="2026-06-20T15:52:34+08:00">2026-06-20</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="far fa-folder"></i>
@@ -3198,423 +3512,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://troyeeee673.github.io/2026/06/13/%E7%AC%AC%E5%85%AD%E7%AB%A0%E3%80%81%E8%BF%9B%E7%A8%8B%E9%97%B4%E9%80%9A%E4%BF%A1%E4%B8%8ESocket/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/troye.jpg">
-      <meta itemprop="name" content="Huiting_Yang">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Linux系统编程">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2026/06/13/%E7%AC%AC%E5%85%AD%E7%AB%A0%E3%80%81%E8%BF%9B%E7%A8%8B%E9%97%B4%E9%80%9A%E4%BF%A1%E4%B8%8ESocket/" class="post-title-link" itemprop="url">第六章、进程间通信与Socket</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2026-06-13 18:30:14 / 修改时间：19:01:41" itemprop="dateCreated datePublished" datetime="2026-06-13T18:30:14+08:00">2026-06-13</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Linux%E7%B3%BB%E7%BB%9F%E7%BC%96%E7%A8%8B/" itemprop="url" rel="index"><span itemprop="name">Linux系统编程</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <blockquote>
-<p>本章总结的重点是：同一主机关注 IPC 机制，不同主机关注 socket、字节序、UDP&#x2F;TCP 通信流程。</p>
-</blockquote>
-<h2 id="一、进程为什么需要通信"><a href="#一、进程为什么需要通信" class="headerlink" title="一、进程为什么需要通信"></a>一、进程为什么需要通信</h2><p>进程拥有独立的地址空间，这是稳定性和安全性的基础。但现实程序经常需要协作：</p>
-<ul>
-<li>一个进程采集数据，另一个进程处理数据。</li>
-<li>父进程创建子进程执行任务，并接收结果。</li>
-<li>多个服务进程共享状态。</li>
-<li>不同主机上的程序通过网络交换消息。</li>
-</ul>
-<p>这就需要 IPC，也就是 Inter-Process Communication，进程间通信。</p>
-<p>通信场景分成两类：</p>
-<ul>
-<li>同一主机：管道、FIFO、System V IPC、共享内存等。</li>
-<li>不同主机：socket、UDP、TCP。</li>
-</ul>
-<h2 id="二、同一主机：管道"><a href="#二、同一主机：管道" class="headerlink" title="二、同一主机：管道"></a>二、同一主机：管道</h2><p>管道必须凑齐读写双方。管道由内核提供，是单工通信机制，并且具有自同步特性：快的一方会被慢的一方限制。</p>
-<p>匿名管道：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">pipe</span><span class="params">(<span class="type">int</span> pipefd[<span class="number">2</span>])</span>;</span><br></pre></td></tr></table></figure>
-
-<p><code>pipefd[0]</code> 是读端，<code>pipefd[1]</code> 是写端。匿名管道通常用于有亲缘关系的进程，例如父子进程。</p>
-<p>如果需要双工通信，可以使用两个单工管道：</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">父进程写 -&gt; pipe1 -&gt; 子进程读</span><br><span class="line">子进程写 -&gt; pipe2 -&gt; 父进程读</span><br></pre></td></tr></table></figure>
-
-<p>命名管道 FIFO：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">mkfifo</span><span class="params">(<span class="type">const</span> <span class="type">char</span> *pathname, <span class="type">mode_t</span> mode)</span>;</span><br></pre></td></tr></table></figure>
-
-<p>FIFO 有文件名，可以让没有亲缘关系的进程通过路径找到同一个通信通道。</p>
-<h2 id="三、System-V-IPC"><a href="#三、System-V-IPC" class="headerlink" title="三、System V IPC"></a>三、System V IPC</h2><p>XSI &#x2F; System V IPC 的关键概念：</p>
-<ul>
-<li><code>key</code>：通信双方通过同一个 key 找到同一个 IPC 对象。</li>
-<li><code>ftok()</code>：根据路径和项目 ID 生成 key。</li>
-<li><code>xxxget</code>：创建或获取对象。</li>
-<li><code>xxxop</code>：操作对象。</li>
-<li><code>xxxctl</code>：控制对象，例如删除。</li>
-</ul>
-<p>三类典型对象：</p>
-<ul>
-<li>Message Queues：消息队列。</li>
-<li>Semaphore Arrays：信号量数组。</li>
-<li>Shared Memory：共享内存。</li>
-</ul>
-<p>消息队列常见函数：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">msgget();</span><br><span class="line">msgsnd();</span><br><span class="line">msgrcv();</span><br><span class="line">msgctl();</span><br></pre></td></tr></table></figure>
-
-<p>共享内存速度快，因为数据不需要在内核和用户空间之间反复复制。但它不自带同步机制，通常要配合信号量、互斥量或文件锁。</p>
-<p>查看系统 IPC 对象可以使用：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ipcs</span><br></pre></td></tr></table></figure>
-
-<p>删除残留 IPC 对象可以使用：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ipcrm</span><br></pre></td></tr></table></figure>
-
-<h2 id="四、主动端与被动端"><a href="#四、主动端与被动端" class="headerlink" title="四、主动端与被动端"></a>四、主动端与被动端</h2><ul>
-<li>主动端：先发包的一方。</li>
-<li>被动端：先收包的一方，通常先运行并等待数据。</li>
-</ul>
-<p>在消息队列中，如果主动方先运行并发送数据，消息可能会被内核缓存起来，缓存能力受系统限制影响。网络编程中也有类似思想：服务器一般先启动监听，客户端再连接或发送。</p>
-<h2 id="五、项目练习：俄罗斯方块"><a href="#五、项目练习：俄罗斯方块" class="headerlink" title="五、项目练习：俄罗斯方块"></a>五、项目练习：俄罗斯方块</h2><ul>
-<li>图形问题：VT 图形码以光标为单位绘图，framebuffer 以像素为单位着色。</li>
-<li>输入设备设置：<code>tcgetattr()</code>、<code>tcsetattr()</code>。</li>
-<li>并发：下落逻辑和键盘输入响应。</li>
-</ul>
-<p>这个练习非常适合串联系统编程知识：</p>
-<ul>
-<li>终端控制用于绘制界面。</li>
-<li>非阻塞输入或多线程用于同时处理下落和键盘。</li>
-<li>定时器或线程 sleep 用于控制节奏。</li>
-<li>结构体用于表示方块、地图和状态。</li>
-</ul>
-<p>如果扩展成多进程版本，还可以用管道或共享内存把输入、渲染和游戏逻辑拆开。</p>
-<h2 id="六、不同主机：Socket"><a href="#六、不同主机：Socket" class="headerlink" title="六、不同主机：Socket"></a>六、不同主机：Socket</h2><p>socket 是一个中间层，用于协调通信协议和实现方式。</p>
-<p>创建 socket：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">socket</span><span class="params">(<span class="type">int</span> domain, <span class="type">int</span> type, <span class="type">int</span> protocol)</span>;</span><br></pre></td></tr></table></figure>
-
-<p>返回值仍然是文件描述符，因此 socket 也可以配合 <code>read/write/select/poll/epoll</code> 使用。</p>
-<p>常见类型：</p>
-<ul>
-<li><code>SOCK_DGRAM</code>：数据报，常用于 UDP。无连接、不可靠、保留消息边界。</li>
-<li><code>SOCK_STREAM</code>：字节流，常用于 TCP。有连接、可靠、有序，但没有消息边界。</li>
-</ul>
-<h2 id="七、字节序与跨主机传输"><a href="#七、字节序与跨主机传输" class="headerlink" title="七、字节序与跨主机传输"></a>七、字节序与跨主机传输</h2><p>跨主机传输要注意的问题：</p>
-<ul>
-<li>字节序：大端、小端。</li>
-<li>主机字节序与网络字节序。</li>
-<li>字节对齐。</li>
-<li>类型长度问题。</li>
-</ul>
-<p>常用转换函数：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">htons();</span><br><span class="line">htonl();</span><br><span class="line">ntohs();</span><br><span class="line">ntohl();</span><br></pre></td></tr></table></figure>
-
-<p>IP 地址转换：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">inet_pton();</span><br><span class="line">inet_ntop();</span><br></pre></td></tr></table></figure>
-
-<p>网络协议中应尽量使用固定宽度类型，例如 <code>uint32_t</code>、<code>int32_t</code>，避免不同平台上 <code>int</code>、<code>long</code> 长度不同导致协议解析错误。</p>
-<h2 id="八、UDP-通信流程"><a href="#八、UDP-通信流程" class="headerlink" title="八、UDP 通信流程"></a>八、UDP 通信流程</h2><p>报式套接字流程：</p>
-<p>被动端：</p>
-<ol>
-<li>获取 socket。</li>
-<li>绑定 socket 地址。</li>
-<li>收发消息。</li>
-<li>关闭 socket。</li>
-</ol>
-<p>主动端：</p>
-<ol>
-<li>获取 socket。</li>
-<li>可以绑定地址，也可以让系统自动分配。</li>
-<li>收发消息。</li>
-<li>关闭 socket。</li>
-</ol>
-<p>常用函数：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">socket();</span><br><span class="line">bind();</span><br><span class="line">sendto();</span><br><span class="line">recvfrom();</span><br><span class="line">setsockopt();</span><br><span class="line">getsockopt();</span><br></pre></td></tr></table></figure>
-
-<p>UDP 可能丢包。原笔记中分析了原因和解决思路：</p>
-<ul>
-<li>原因：阻塞、缓冲区满、网络拥塞等。</li>
-<li>解决：流控、确认机制、停等式流控、重传。</li>
-</ul>
-<p>TTL 表示数据包在网络中最多经过的路由跳数，Linux 常见默认值为 64，Windows 常见默认值为 128。</p>
-<h2 id="九、TCP-通信流程"><a href="#九、TCP-通信流程" class="headerlink" title="九、TCP 通信流程"></a>九、TCP 通信流程</h2><p>流式套接字流程：</p>
-<p>主动端：</p>
-<ol>
-<li>获取 socket。</li>
-<li>给 socket 取得地址。</li>
-<li>发起连接。</li>
-<li>收发消息。</li>
-<li>关闭连接。</li>
-</ol>
-<p>被动端：</p>
-<ol>
-<li>获取 socket。</li>
-<li>绑定地址。</li>
-<li>设置为监听模式。</li>
-<li>接受连接。</li>
-<li>收发消息。</li>
-<li>关闭连接。</li>
-</ol>
-<p>对应函数通常是：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">socket();</span><br><span class="line">bind();</span><br><span class="line">listen();</span><br><span class="line">accept();</span><br><span class="line">connect();</span><br><span class="line">send();</span><br><span class="line">recv();</span><br><span class="line">close();</span><br></pre></td></tr></table></figure>
-
-<p>TCP 是字节流协议，没有消息边界。应用层必须自己设计协议，例如：</p>
-<ul>
-<li>固定长度消息。</li>
-<li>分隔符协议，例如按 <code>\n</code> 分隔。</li>
-<li>长度字段 + 数据体。</li>
-</ul>
-<p>如果忽略粘包、拆包问题，程序在简单测试中可能正常，一旦数据量变大就会出错。</p>
-<h2 id="十、程序学习代码"><a href="#十、程序学习代码" class="headerlink" title="十、程序学习代码"></a>十、程序学习代码</h2><p><strong>源码地址</strong>：<a target="_blank" rel="noopener" href="https://github.com/troyeeee673/Linux-/tree/main/%E7%AC%AC%E5%85%AD%E7%AB%A0%E8%BF%9B%E7%A8%8B%E9%97%B4%E9%80%9A%E4%BF%A1%E4%B8%8ESocket/IPC">https://github.com/troyeeee673/Linux-/tree/main/%E7%AC%AC%E5%85%AD%E7%AB%A0%E8%BF%9B%E7%A8%8B%E9%97%B4%E9%80%9A%E4%BF%A1%E4%B8%8ESocket/IPC</a></p>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>IPC 的选择取决于通信双方在哪里、数据量多大、是否需要同步、是否跨主机。管道简单，消息队列有边界，共享内存快但需要同步，socket 则把通信扩展到网络。掌握这些机制后，就能从单进程程序走向多进程服务和网络服务。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://troyeeee673.github.io/2026/06/11/%E7%AC%AC%E4%BA%94%E7%AB%A0%E3%80%81%E9%AB%98%E7%BA%A7I-O%E6%9C%BA%E5%88%B6/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/troye.jpg">
-      <meta itemprop="name" content="Huiting_Yang">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Linux系统编程">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2026/06/11/%E7%AC%AC%E4%BA%94%E7%AB%A0%E3%80%81%E9%AB%98%E7%BA%A7I-O%E6%9C%BA%E5%88%B6/" class="post-title-link" itemprop="url">第五章、高级I/O机制</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2026-06-11 14:31:35 / 修改时间：15:04:33" itemprop="dateCreated datePublished" datetime="2026-06-11T14:31:35+08:00">2026-06-11</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Linux%E7%B3%BB%E7%BB%9F%E7%BC%96%E7%A8%8B/" itemprop="url" rel="index"><span itemprop="name">Linux系统编程</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h1 id="系统编程：高级-I-O-机制"><a href="#系统编程：高级-I-O-机制" class="headerlink" title="系统编程：高级 I&#x2F;O 机制"></a>系统编程：高级 I&#x2F;O 机制</h1><blockquote>
-<p>高级 I&#x2F;O 主要解决阻塞、复用、映射、锁和管道等场景下的效率与同步问题。</p>
-</blockquote>
-<h2 id="一、高级-I-O-解决什么问题"><a href="#一、高级-I-O-解决什么问题" class="headerlink" title="一、高级 I&#x2F;O 解决什么问题"></a>一、高级 I&#x2F;O 解决什么问题</h2><p>普通文件读写只需要 <code>read()</code> &#x2F; <code>write()</code> 就能完成，但真实系统里经常会遇到更复杂的问题：</p>
-<ul>
-<li>一个程序要同时处理多个文件描述符。</li>
-<li>某些 I&#x2F;O 操作可能长期阻塞。</li>
-<li>需要把文件直接映射到内存操作。</li>
-<li>多进程需要协调访问同一个文件。</li>
-<li>进程之间需要通过管道传递数据。</li>
-</ul>
-<p>这就是高级 I&#x2F;O 的意义。它不是替代基础 I&#x2F;O，而是在基础 I&#x2F;O 之上解决效率、并发和同步问题。</p>
-<h2 id="二、非阻塞-I-O"><a href="#二、非阻塞-I-O" class="headerlink" title="二、非阻塞 I&#x2F;O"></a>二、非阻塞 I&#x2F;O</h2><p>非阻塞 I&#x2F;O 的三种理解方式：</p>
-<ol>
-<li>将文件描述符设置为非阻塞。</li>
-<li>让系统调用以非阻塞方式工作。</li>
-<li>配合 <code>select</code>、<code>poll</code>、<code>epoll</code> 等 I&#x2F;O 多路复用机制。</li>
-</ol>
-<p>常见设置方式是通过 <code>fcntl()</code> 给 fd 加上 <code>O_NONBLOCK</code>：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> flags = fcntl(fd, F_GETFL);</span><br><span class="line">fcntl(fd, F_SETFL, flags | O_NONBLOCK);</span><br></pre></td></tr></table></figure>
-
-<p>非阻塞并不是“更快”的同义词。它的核心是：如果当前不能完成操作，调用立即返回，而不是让线程睡眠等待。</p>
-<p>典型返回情况是 <code>read()</code> 或 <code>write()</code> 返回 <code>-1</code>，并设置 <code>errno</code> 为 <code>EAGAIN</code> 或 <code>EWOULDBLOCK</code>。程序需要识别这类情况，稍后再试。</p>
-<h2 id="三、有限状态机编程"><a href="#三、有限状态机编程" class="headerlink" title="三、有限状态机编程"></a>三、有限状态机编程</h2><p>“有限状态机编程”和“数据中继模型”。这是非阻塞 I&#x2F;O 的重要配套思想。</p>
-<p>阻塞式代码可以按自然流程写：</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">读请求 -&gt; 处理 -&gt; 写响应</span><br></pre></td></tr></table></figure>
-
-<p>但非阻塞 I&#x2F;O 中，每一步都可能暂时无法完成。程序需要记录当前状态，例如：</p>
-<ul>
-<li>正在读取请求头。</li>
-<li>正在读取请求体。</li>
-<li>正在处理数据。</li>
-<li>正在写响应。</li>
-<li>写了一部分，等待下次继续写。</li>
-</ul>
-<p>这就是状态机。网络服务器、代理、中继程序、终端交互程序都会大量使用这种思想。</p>
-<h2 id="四、I-O-多路转接：select"><a href="#四、I-O-多路转接：select" class="headerlink" title="四、I&#x2F;O 多路转接：select"></a>四、I&#x2F;O 多路转接：<code>select</code></h2><p> <code>select()</code> 的总结：</p>
-<ul>
-<li>以事件为单位组织文件描述符。</li>
-<li>可移植，支持多种操作系统。</li>
-<li>监视文件描述符数量有限，通常受 <code>FD_SETSIZE</code> 限制。</li>
-<li>每次调用都要把集合从用户空间复制到内核空间，效率较低。</li>
-<li>监视现场和结果保存在同一块空间，调用后原集合会被修改。</li>
-</ul>
-<p><code>select()</code> 的典型问题是：每次调用前都要重新初始化 fd 集合。否则上一次返回结果会覆盖原监控集合。</p>
-<p>它适合学习 I&#x2F;O 复用原理，也适合 fd 数量不多、跨平台要求高的场景。</p>
-<h2 id="五、poll-与-epoll"><a href="#五、poll-与-epoll" class="headerlink" title="五、poll 与 epoll"></a>五、<code>poll</code> 与 <code>epoll</code></h2><ul>
-<li><code>poll()</code> 可移植，解决了 <code>select()</code> 监视 fd 数量有限的问题。</li>
-<li><code>poll()</code> 以文件描述符为单位组织事件。</li>
-<li><code>epoll()</code> 是 Linux 特有机制，不可移植，但性能更好。</li>
-</ul>
-<p>可以简单对比：</p>
-<table>
-<thead>
-<tr>
-<th>机制</th>
-<th>特点</th>
-<th>适合场景</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>select</code></td>
-<td>可移植，fd 数量有限</td>
-<td>小规模、多平台</td>
-</tr>
-<tr>
-<td><code>poll</code></td>
-<td>可移植，数组组织 fd</td>
-<td>中等规模</td>
-</tr>
-<tr>
-<td><code>epoll</code></td>
-<td>Linux 特有，事件驱动效率高</td>
-<td>大量连接、高并发</td>
-</tr>
-</tbody></table>
-<p><code>epoll</code> 的优势不是“任何情况下都更快”，而是在大量 fd 中只有少量活跃时，可以避免反复线性扫描和大量数据复制。</p>
-<h2 id="六、补充读写函数：readv、writev、readn、writen"><a href="#六、补充读写函数：readv、writev、readn、writen" class="headerlink" title="六、补充读写函数：readv、writev、readn、writen"></a>六、补充读写函数：<code>readv</code>、<code>writev</code>、<code>readn</code>、<code>writen</code></h2><p>分散读和聚集写：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">readv();</span><br><span class="line">writev();</span><br></pre></td></tr></table></figure>
-
-<p><code>writev()</code> 可以把多个不连续缓冲区一次写出，适合协议头和数据体分开放置的场景：</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[header buffer] + [body buffer] -&gt; 一次 writev</span><br></pre></td></tr></table></figure>
-
-<p>这能减少数据拷贝，也能减少系统调用次数。</p>
-<p> Unix 网络编程中常用的封装函数：</p>
-<ul>
-<li><code>readn</code>：坚持读够 n 个字节。</li>
-<li><code>writen</code>：坚持写够 n 个字节。</li>
-</ul>
-<p>这两个不是标准系统调用，而是工程中常写的工具函数，用来处理短读、短写问题。</p>
-<h2 id="七、存储映射-I-O：mmap"><a href="#七、存储映射-I-O：mmap" class="headerlink" title="七、存储映射 I&#x2F;O：mmap"></a>七、存储映射 I&#x2F;O：<code>mmap</code></h2><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">mmap();</span><br><span class="line">munmap();</span><br></pre></td></tr></table></figure>
-
-<p><code>mmap()</code> 可以把文件映射到进程地址空间。映射成功后，程序像访问内存一样访问文件内容。</p>
-<p>典型用途：</p>
-<ul>
-<li>大文件随机访问。</li>
-<li>进程间共享内存。</li>
-<li>文件内容快速扫描。</li>
-<li>匿名映射作为特殊内存分配方式。</li>
-</ul>
-<p>提醒：如果 <code>mmap()</code> 的 <code>flags</code> 参数使用匿名映射，那么 <code>mmap()</code> &#x2F; <code>munmap()</code> 可以在某些场景下类似 <code>malloc()</code> &#x2F; <code>free()</code> 使用。</p>
-<p>需要注意：</p>
-<ul>
-<li>映射长度通常要按页对齐处理。</li>
-<li>写映射文件时，要理解 <code>MAP_SHARED</code> 和 <code>MAP_PRIVATE</code> 的区别。</li>
-<li>文件被截断后继续访问原映射区域可能触发 <code>SIGBUS</code>。</li>
-</ul>
-<h2 id="八、文件锁"><a href="#八、文件锁" class="headerlink" title="八、文件锁"></a>八、文件锁</h2><p>三类文件锁接口：</p>
-<ul>
-<li><code>fcntl()</code></li>
-<li><code>lockf()</code></li>
-<li><code>flock()</code></li>
-</ul>
-<p>文件锁用于协调多个进程对同一文件的访问。典型场景是日志、数据库文件、状态文件、单实例程序。</p>
-<p>“意外解锁问题”：<code>close()</code> 会自动释放锁。更细一点说，传统记录锁和进程、inode 关联密切，多个 fd 指向同一个文件时，关闭其中一个 fd 可能影响该进程持有的锁。这类语义比较容易出错，写程序时要明确锁的生命周期和 fd 的生命周期。</p>
-<h2 id="九、管道与读者写者问题"><a href="#九、管道与读者写者问题" class="headerlink" title="九、管道与读者写者问题"></a>九、管道与读者写者问题</h2><p>管道“类似于队列”。这是很好的直觉。管道是一种先进先出的字节流通信机制，常见于父子进程之间，也常见于 shell 命令组合：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cat</span> file.txt | grep hello | <span class="built_in">wc</span> -l</span><br></pre></td></tr></table></figure>
-
-<p>管道有读端和写端。读写双方是否存在，会影响阻塞和返回行为：</p>
-<ul>
-<li>没有数据且写端未关闭，读端可能阻塞。</li>
-<li>写端关闭后，读端读完剩余数据再读会返回 0。</li>
-<li>读端关闭后，写端继续写可能收到 <code>SIGPIPE</code>。</li>
-</ul>
-<p>读者写者问题则是同步模型中的经典问题：多个读者可以并发读，但写者需要独占访问。读写锁正是这个问题的常见解决方式。</p>
-<h2 id="十、巩固任务"><a href="#十、巩固任务" class="headerlink" title="十、巩固任务"></a>十、巩固任务</h2><ol>
-<li>把标准输入设置为非阻塞，观察 <code>EAGAIN</code>。</li>
-<li>用 <code>select()</code> 同时监听标准输入和管道。</li>
-<li>用 <code>poll()</code> 改写同样功能。</li>
-<li>在 Linux 上用 <code>epoll()</code> 写一个简单 echo server。</li>
-<li>用 <code>mmap()</code> 实现文件复制或关键字扫描。</li>
-<li>用 <code>fcntl()</code> 文件锁实现单实例程序。</li>
-</ol>
-<p><strong>源码地址</strong>：<a target="_blank" rel="noopener" href="https://github.com/troyeeee673/Linux-/tree/main/%E7%AC%AC%E4%BA%94%E7%AB%A0%E9%AB%98%E7%BA%A7IO">https://github.com/troyeeee673/Linux-/tree/main/%E7%AC%AC%E4%BA%94%E7%AB%A0%E9%AB%98%E7%BA%A7IO</a></p>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>高级 I&#x2F;O 的核心不是 API 数量，而是 I&#x2F;O 模型的变化。阻塞、非阻塞、多路复用、内存映射和文件锁分别解决不同层面的问题。真正写程序时，要先判断瓶颈和需求，再选择机制：小规模用简单模型，大量连接用事件驱动，共享文件用锁，大文件随机访问考虑 <code>mmap()</code>。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -3686,7 +3583,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">16</span>
+          <span class="site-state-item-count">18</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -3699,7 +3596,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-count">12</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
