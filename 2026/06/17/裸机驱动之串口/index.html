@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 8.1.2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"troyeeee673.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":"default"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":true,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":true,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="IMX6U 串口学习与使用1、串口基础概念串口通信通常指 UART&#x2F;USART 通信。UART 是异步串行通信接口，它不需要单独的时钟线，而是通过双方约定好的波特率来完成数据收发。 在嵌入式开发中，经常会把“串口”混在一起说，但实际需要区分三个层次：    层次 说明 常见例子    协议层 规定一帧数据怎么组织 起始位、数据位、校验位、停止位、波特率   控制器层 芯片内部的 UART">
+<meta property="og:type" content="article">
+<meta property="og:title" content="逻辑驱动编写之串口">
+<meta property="og:url" content="https://troyeeee673.github.io/2026/06/17/%E8%A3%B8%E6%9C%BA%E9%A9%B1%E5%8A%A8%E4%B9%8B%E4%B8%B2%E5%8F%A3/index.html">
+<meta property="og:site_name" content="Linux系统编程">
+<meta property="og:description" content="IMX6U 串口学习与使用1、串口基础概念串口通信通常指 UART&#x2F;USART 通信。UART 是异步串行通信接口，它不需要单独的时钟线，而是通过双方约定好的波特率来完成数据收发。 在嵌入式开发中，经常会把“串口”混在一起说，但实际需要区分三个层次：    层次 说明 常见例子    协议层 规定一帧数据怎么组织 起始位、数据位、校验位、停止位、波特率   控制器层 芯片内部的 UART">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-06-17T00:28:19.402Z">
+<meta property="article:modified_time" content="2026-06-27T14:27:07.056Z">
+<meta property="article:author" content="Huiting_Yang">
+<meta property="article:tag" content="Linux驱动开发">
+<meta property="article:tag" content="裸机开发">
+<meta property="article:tag" content="通信协议">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://troyeeee673.github.io/2026/06/17/%E8%A3%B8%E6%9C%BA%E9%A9%B1%E5%8A%A8%E4%B9%8B%E4%B8%B2%E5%8F%A3/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>逻辑驱动编写之串口 | Linux系统编程</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Linux系统编程" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Linux系统编程</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fth fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
+
+  <a href="https://github.com/yourname" class="github-corner" title="Follow me on GitHub" aria-label="Follow me on GitHub" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://troyeeee673.github.io/2026/06/17/%E8%A3%B8%E6%9C%BA%E9%A9%B1%E5%8A%A8%E4%B9%8B%E4%B8%B2%E5%8F%A3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/troye.jpg">
+      <meta itemprop="name" content="Huiting_Yang">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Linux系统编程">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          逻辑驱动编写之串口
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2026-06-17 08:28:19" itemprop="dateCreated datePublished" datetime="2026-06-17T08:28:19+08:00">2026-06-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-06-27 22:27:07" itemprop="dateModified" datetime="2026-06-27T22:27:07+08:00">2026-06-27</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux%E8%A3%B8%E6%9C%BA%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/" itemprop="url" rel="index"><span itemprop="name">Linux裸机驱动开发</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="IMX6U-串口学习与使用"><a href="#IMX6U-串口学习与使用" class="headerlink" title="IMX6U 串口学习与使用"></a>IMX6U 串口学习与使用</h1><h2 id="1、串口基础概念"><a href="#1、串口基础概念" class="headerlink" title="1、串口基础概念"></a>1、串口基础概念</h2><p>串口通信通常指 UART&#x2F;USART 通信。UART 是异步串行通信接口，它不需要单独的时钟线，而是通过双方约定好的波特率来完成数据收发。</p>
+<p>在嵌入式开发中，经常会把“串口”混在一起说，但实际需要区分三个层次：</p>
+<table>
+<thead>
+<tr>
+<th>层次</th>
+<th>说明</th>
+<th>常见例子</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>协议层</td>
+<td>规定一帧数据怎么组织</td>
+<td>起始位、数据位、校验位、停止位、波特率</td>
+</tr>
+<tr>
+<td>控制器层</td>
+<td>芯片内部的 UART 外设</td>
+<td>i.MX6ULL 的 UART1、UART2 等</td>
+</tr>
+<tr>
+<td>电气层</td>
+<td>引脚上实际使用的电平标准</td>
+<td>TTL&#x2F;CMOS 电平、RS232 电平、RS485 电平</td>
+</tr>
+</tbody></table>
+<p>也就是说，UART 描述的是“怎么收发数据”，TTL、RS232、RS485 描述的是“电信号长什么样”。<br>同样是 UART 数据，可以通过 TTL 电平直接连接，也可以经过 MAX3232 转成 RS232，或者经过 SP3485&#x2F;MAX485 等芯片转成 RS485。</p>
+<hr>
+<h2 id="2、串口数据格式"><a href="#2、串口数据格式" class="headerlink" title="2、串口数据格式"></a>2、串口数据格式</h2><p>UART 一帧数据通常由空闲位、起始位、数据位、校验位和停止位组成。</p>
+<h3 id="2-1-空闲位"><a href="#2-1-空闲位" class="headerlink" title="2.1 空闲位"></a>2.1 空闲位</h3><p>数据线在空闲状态时为逻辑“1”状态，也就是高电平，表示当前总线空闲，没有数据传输。</p>
+<h3 id="2-2-起始位"><a href="#2-2-起始位" class="headerlink" title="2.2 起始位"></a>2.2 起始位</h3><p>当要开始传输数据时，发送端先发送一个逻辑“0”，也就是将数据线拉低。<br>接收端检测到从高电平到低电平的跳变后，就认为一帧数据开始了。</p>
+<h3 id="2-3-数据位"><a href="#2-3-数据位" class="headerlink" title="2.3 数据位"></a>2.3 数据位</h3><p>数据位是实际要传输的数据。数据位数一般可以选择 5~8 位，常用配置是 8 位数据位。<br>UART 传输时通常是低位先发，高位后发。</p>
+<p>例如发送 <code>0x55</code>，二进制为：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">0x55 = 0101 0101B</span><br></pre></td></tr></table></figure>
+
+<p>在线路上传输的顺序是从 bit0 到 bit7。</p>
+<h3 id="2-4-奇偶校验位"><a href="#2-4-奇偶校验位" class="headerlink" title="2.4 奇偶校验位"></a>2.4 奇偶校验位</h3><p>奇偶校验位用于简单检查数据传输是否出现错误。<br>它只能发现部分错误，不能定位错误，也不能纠正错误。实际项目中，如果上层协议已经有 CRC 校验，UART 本身通常可以不启用奇偶校验。</p>
+<p>常见配置：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">8N1：8 位数据位，无校验，1 位停止位</span><br><span class="line">8E1：8 位数据位，偶校验，1 位停止位</span><br><span class="line">8O1：8 位数据位，奇校验，1 位停止位</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-5-停止位"><a href="#2-5-停止位" class="headerlink" title="2.5 停止位"></a>2.5 停止位</h3><p>停止位表示一帧数据传输结束。停止位为逻辑“1”，也就是高电平。<br>停止位可以选择 1 位、1.5 位或 2 位，实际开发中最常用的是 1 位停止位。</p>
+<h3 id="2-6-波特率"><a href="#2-6-波特率" class="headerlink" title="2.6 波特率"></a>2.6 波特率</h3><p>波特率表示串口数据传输速率，可以理解为每秒传输多少个符号位。<br>常见波特率有：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">9600、19200、38400、57600、115200、921600</span><br></pre></td></tr></table></figure>
+
+<p>嵌入式调试中最常见的是 <code>115200 8N1</code>。</p>
+<p>需要注意：<br>发送端和接收端的波特率、数据位、校验位、停止位必须保持一致，否则会出现乱码、丢数据或者无法接收的问题。</p>
+<hr>
+<h2 id="3、TTL-电平、RS232-电平和-RS485-电平"><a href="#3、TTL-电平、RS232-电平和-RS485-电平" class="headerlink" title="3、TTL 电平、RS232 电平和 RS485 电平"></a>3、TTL 电平、RS232 电平和 RS485 电平</h2><h3 id="3-1-为什么要区分电平标准"><a href="#3-1-为什么要区分电平标准" class="headerlink" title="3.1 为什么要区分电平标准"></a>3.1 为什么要区分电平标准</h3><p>UART 本身只定义了数据收发格式，但没有固定电压标准。<br>所以在实际硬件中，UART 信号可能对应不同电气接口：</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>传输方式</th>
+<th>常见电压</th>
+<th>传输距离</th>
+<th>抗干扰能力</th>
+<th>常见场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TTL&#x2F;CMOS UART</td>
+<td>单端信号</td>
+<td>3.3V 或 5V</td>
+<td>短距离</td>
+<td>较弱</td>
+<td>开发板调试、芯片间通信</td>
+</tr>
+<tr>
+<td>RS232</td>
+<td>单端信号，正负电压</td>
+<td>通常为 ±3V 到 ±15V</td>
+<td>中短距离</td>
+<td>一般</td>
+<td>老式 PC 串口、工业设备</td>
+</tr>
+<tr>
+<td>RS485</td>
+<td>差分信号</td>
+<td>看 A&#x2F;B 差分电压</td>
+<td>长距离</td>
+<td>强</td>
+<td>工业现场、Modbus RTU、多机通信</td>
+</tr>
+</tbody></table>
+<p>i.MX6ULL 芯片 UART 引脚输出的是 TTL&#x2F;CMOS 逻辑电平，不是 RS232，也不是 RS485。<br>如果要接 RS232 设备，需要电平转换芯片；如果要接 RS485 总线，需要 RS485 收发器芯片。</p>
+<hr>
+<h2 id="4、TTL-电平串口"><a href="#4、TTL-电平串口" class="headerlink" title="4、TTL 电平串口"></a>4、TTL 电平串口</h2><h3 id="4-1-TTL-电平串口的特点"><a href="#4-1-TTL-电平串口的特点" class="headerlink" title="4.1 TTL 电平串口的特点"></a>4.1 TTL 电平串口的特点</h3><p>TTL 串口是嵌入式开发中最常见的调试串口形式。<br>它直接使用 MCU、MPU 或开发板引脚的逻辑电平进行通信。</p>
+<p>常见 TTL 串口引脚：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">TXD：发送数据</span><br><span class="line">RXD：接收数据</span><br><span class="line">GND：参考地</span><br><span class="line">VCC：电源，一般只用于给 USB 转串口模块供电，不一定要连接目标板</span><br></pre></td></tr></table></figure>
+
+<p>TTL 串口是单端信号，TXD 和 RXD 都是相对于 GND 来判断高低电平的。</p>
+<h3 id="4-2-TTL-电平范围"><a href="#4-2-TTL-电平范围" class="headerlink" title="4.2 TTL 电平范围"></a>4.2 TTL 电平范围</h3><p>不同芯片的 IO 电压不一样，常见有 3.3V 和 5V。</p>
+<p>以 3.3V TTL&#x2F;CMOS 串口为例：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">逻辑 1：高电平，通常接近 3.3V</span><br><span class="line">逻辑 0：低电平，通常接近 0V</span><br><span class="line">空闲状态：逻辑 1，也就是高电平</span><br><span class="line">起始位：逻辑 0，也就是低电平</span><br></pre></td></tr></table></figure>
+
+<p>以 5V TTL 串口为例：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">逻辑 1：高电平，通常接近 5V</span><br><span class="line">逻辑 0：低电平，通常接近 0V</span><br></pre></td></tr></table></figure>
+
+<p>实际芯片会在数据手册中规定输入高电平阈值 VIH 和输入低电平阈值 VIL。<br>不能简单认为所有串口都可以 3.3V 和 5V 混接。</p>
+<h3 id="4-3-i-MX6ULL-串口电平注意事项"><a href="#4-3-i-MX6ULL-串口电平注意事项" class="headerlink" title="4.3 i.MX6ULL 串口电平注意事项"></a>4.3 i.MX6ULL 串口电平注意事项</h3><p>i.MX6ULL 的 UART 管脚属于芯片 IO 管脚，通常工作在 3.3V IO 电平环境下。<br>因此，连接 USB 转 TTL 串口模块时，应选择 3.3V TTL 模式，而不是 5V TTL 模式。</p>
+<p>错误连接可能导致以下问题：</p>
+<ul>
+<li>接 5V TTL 模块时，5V 信号可能超过 i.MX6ULL IO 管脚耐压范围，存在损坏芯片的风险。</li>
+<li>TXD&#x2F;RXD 接反会导致无法收发数据。</li>
+<li>没有共地会导致电平参考不一致，出现乱码或无法通信。</li>
+<li>把 TTL 串口直接接到 RS232 接口，可能无法通信，甚至损坏器件。</li>
+</ul>
+<h3 id="4-4-TTL-串口接线方式"><a href="#4-4-TTL-串口接线方式" class="headerlink" title="4.4 TTL 串口接线方式"></a>4.4 TTL 串口接线方式</h3><p>两个 UART 设备之间连接时，需要交叉连接：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">设备 A TXD  ---&gt;  设备 B RXD</span><br><span class="line">设备 A RXD  &lt;---  设备 B TXD</span><br><span class="line">设备 A GND  ---   设备 B GND</span><br></pre></td></tr></table></figure>
+
+<p>对于 i.MX6ULL 开发板连接 USB 转 TTL 模块：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">IMX6ULL TXD  ---&gt;  USB 转串口 RXD</span><br><span class="line">IMX6ULL RXD  &lt;---  USB 转串口 TXD</span><br><span class="line">IMX6ULL GND  ---   USB 转串口 GND</span><br></pre></td></tr></table></figure>
+
+<p>一般不要随意连接 USB 转串口模块的 VCC 到开发板电源，除非确认供电设计允许这样做。</p>
+<h3 id="4-5-TTL-串口调试建议"><a href="#4-5-TTL-串口调试建议" class="headerlink" title="4.5 TTL 串口调试建议"></a>4.5 TTL 串口调试建议</h3><p>使用示波器或逻辑分析仪观察 TTL 串口波形时，可以看到：</p>
+<ul>
+<li>空闲时 TXD 为高电平。</li>
+<li>发送数据时，先出现一个低电平起始位。</li>
+<li>波形高低电平通常在 0V 和 3.3V 之间变化。</li>
+<li>如果波特率为 115200，那么 1 bit 的时间约为：</li>
+</ul>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1 / 115200 ≈ 8.68 us</span><br></pre></td></tr></table></figure>
+
+<p>如果串口打印乱码，优先检查：</p>
+<ol>
+<li>波特率是否一致。</li>
+<li>数据格式是否一致，比如是否都是 8N1。</li>
+<li>TXD&#x2F;RXD 是否交叉连接。</li>
+<li>GND 是否共地。</li>
+<li>USB 转串口模块是否选择了正确的 3.3V&#x2F;5V 电平。</li>
+<li>串口管脚复用和时钟配置是否正确。</li>
+</ol>
+<hr>
+<h2 id="5、RS232-电平串口"><a href="#5、RS232-电平串口" class="headerlink" title="5、RS232 电平串口"></a>5、RS232 电平串口</h2><h3 id="5-1-RS232-的特点"><a href="#5-1-RS232-的特点" class="headerlink" title="5.1 RS232 的特点"></a>5.1 RS232 的特点</h3><p>RS232 是传统 PC 串口和部分工业设备常用的电气标准。<br>它和 TTL 串口虽然都可以承载 UART 数据，但电平完全不同。</p>
+<p>RS232 的主要特点：</p>
+<ul>
+<li>使用单端信号。</li>
+<li>需要相对于 GND 判断电压。</li>
+<li>电平通常为正负电压。</li>
+<li>逻辑电平和 TTL 相比是反向的。</li>
+<li>常见接口形式是 DB9 接头。</li>
+</ul>
+<h3 id="5-2-RS232-电平逻辑"><a href="#5-2-RS232-电平逻辑" class="headerlink" title="5.2 RS232 电平逻辑"></a>5.2 RS232 电平逻辑</h3><p>RS232 电平通常可以理解为：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">逻辑 1：负电压，常见为 -3V ~ -15V</span><br><span class="line">逻辑 0：正电压，常见为 +3V ~ +15V</span><br></pre></td></tr></table></figure>
+
+<p>这和 TTL 串口不同。TTL 串口中逻辑 1 是高电平，逻辑 0 是低电平；而 RS232 中逻辑 1 通常是负电压，逻辑 0 通常是正电压。</p>
+<p>因此，TTL UART 不能直接接 RS232 接口。<br>如果需要连接 RS232 设备，需要使用 MAX232、MAX3232 等电平转换芯片。</p>
+<hr>
+<h2 id="6、RS485-电平串口"><a href="#6、RS485-电平串口" class="headerlink" title="6、RS485 电平串口"></a>6、RS485 电平串口</h2><h3 id="6-1-RS485-是什么"><a href="#6-1-RS485-是什么" class="headerlink" title="6.1 RS485 是什么"></a>6.1 RS485 是什么</h3><p>RS485 是一种差分通信电气标准。<br>它常用于工业现场，因为它传输距离远、抗干扰能力强，并且支持一条总线上挂多个节点。</p>
+<p>需要注意：<br>RS485 不是 UART 协议本身，它只是电气层标准。<br>在实际项目中，经常是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">UART 控制器  +  RS485 收发器  +  上层协议</span><br></pre></td></tr></table></figure>
+
+<p>例如：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">i.MX6ULL UART  &lt;--&gt;  RS485 收发器  &lt;--&gt;  RS485 总线  &lt;--&gt;  其他 RS485 设备</span><br></pre></td></tr></table></figure>
+
+<p>常见上层协议是 Modbus RTU。</p>
+<h3 id="6-2-RS485-差分信号"><a href="#6-2-RS485-差分信号" class="headerlink" title="6.2 RS485 差分信号"></a>6.2 RS485 差分信号</h3><p>RS485 不像 TTL 那样通过单根信号线相对于 GND 判断高低电平，而是通过 A、B 两根线之间的电压差判断逻辑状态。</p>
+<p>常见 RS485 信号线：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">A：差分信号线</span><br><span class="line">B：差分信号线</span><br><span class="line">GND：参考地，长距离或复杂现场建议连接</span><br></pre></td></tr></table></figure>
+
+<p>RS485 接收器判断的是：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Vdiff = VA - VB</span><br></pre></td></tr></table></figure>
+
+<p>一般可以理解为：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">VA - VB &gt; +200 mV：判断为一种逻辑状态</span><br><span class="line">VA - VB &lt; -200 mV：判断为另一种逻辑状态</span><br></pre></td></tr></table></figure>
+
+<p>不同芯片和厂商对 A&#x2F;B 命名可能存在差异，有些设备会把 A 标成 D+，B 标成 D-；也有设备命名相反。<br>如果接线后完全收不到数据，可以尝试对调 A&#x2F;B，但不要盲目带电频繁插拔。</p>
+<h3 id="6-3-RS485-与-TTL-的区别"><a href="#6-3-RS485-与-TTL-的区别" class="headerlink" title="6.3 RS485 与 TTL 的区别"></a>6.3 RS485 与 TTL 的区别</h3><table>
+<thead>
+<tr>
+<th>对比项</th>
+<th>TTL 串口</th>
+<th>RS485</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>信号方式</td>
+<td>单端信号</td>
+<td>差分信号</td>
+</tr>
+<tr>
+<td>信号线</td>
+<td>TXD、RXD、GND</td>
+<td>A、B、GND</td>
+</tr>
+<tr>
+<td>电平判断</td>
+<td>相对于 GND 的高低电平</td>
+<td>A&#x2F;B 两线电压差</td>
+</tr>
+<tr>
+<td>通信距离</td>
+<td>短，通常板级或桌面调试</td>
+<td>长，可达数百米甚至更远，取决于速率和线缆</td>
+</tr>
+<tr>
+<td>抗干扰能力</td>
+<td>较弱</td>
+<td>强</td>
+</tr>
+<tr>
+<td>多机通信</td>
+<td>不适合直接多机挂总线</td>
+<td>支持总线型多节点</td>
+</tr>
+<tr>
+<td>是否可直接接 i.MX6ULL UART</td>
+<td>可以，但要注意 IO 电平</td>
+<td>不可以，必须经过 RS485 收发器</td>
+</tr>
+</tbody></table>
+<h3 id="6-4-RS485-半双工和全双工"><a href="#6-4-RS485-半双工和全双工" class="headerlink" title="6.4 RS485 半双工和全双工"></a>6.4 RS485 半双工和全双工</h3><p>RS485 常见使用方式是半双工，两根线 A&#x2F;B 既用于发送也用于接收。<br>半双工意味着同一时刻总线上只能有一个设备发送，其他设备接收。</p>
+<p>半双工 RS485 常见收发器管脚：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">RO：Receiver Output，接 UART_RXD</span><br><span class="line">DI：Driver Input，接 UART_TXD</span><br><span class="line">RE：Receiver Enable，接收使能，常为低有效</span><br><span class="line">DE：Driver Enable，发送使能，常为高有效</span><br><span class="line">A/B：RS485 差分总线</span><br></pre></td></tr></table></figure>
+
+<p>典型连接方式：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">i.MX6ULL UART_TXD  ---&gt;  RS485 芯片 DI</span><br><span class="line">i.MX6ULL UART_RXD  &lt;---  RS485 芯片 RO</span><br><span class="line">i.MX6ULL GPIO      ---&gt;  RS485 芯片 DE/RE 控制</span><br><span class="line">RS485 芯片 A/B     &lt;--&gt;  RS485 总线 A/B</span><br></pre></td></tr></table></figure>
+
+<p>很多设计会把 DE 和 &#x2F;RE 接到同一个 GPIO 上：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">GPIO = 1：发送模式，DE 使能，/RE 关闭接收</span><br><span class="line">GPIO = 0：接收模式，DE 关闭，/RE 使能接收</span><br></pre></td></tr></table></figure>
+
+<p>发送 RS485 数据时，软件流程通常是：</p>
+<ol>
+<li>将方向控制 GPIO 置为发送模式。</li>
+<li>通过 UART 发送数据。</li>
+<li>等待 UART 数据真正发送完成，而不是只等发送 FIFO 为空。</li>
+<li>将方向控制 GPIO 切回接收模式。</li>
+</ol>
+<p>如果第 3 步处理不正确，可能会导致最后几个字节还没发完就切回接收模式，出现数据丢失。</p>
+<h3 id="6-5-RS485-终端电阻和偏置电阻"><a href="#6-5-RS485-终端电阻和偏置电阻" class="headerlink" title="6.5 RS485 终端电阻和偏置电阻"></a>6.5 RS485 终端电阻和偏置电阻</h3><p>RS485 总线一般采用总线型布线，不能随意星型连接。<br>在长距离、高速率通信时，需要在总线两端加入终端匹配电阻，常见值为 120Ω。</p>
+<p>终端电阻作用：</p>
+<ul>
+<li>减少信号反射。</li>
+<li>提高长线通信稳定性。</li>
+<li>适合总线两端使用，不是每个节点都加。</li>
+</ul>
+<p>另外，RS485 总线在没有设备发送时可能处于悬空状态。<br>为了让总线空闲时保持确定状态，常会加入偏置电阻，也叫 fail-safe 偏置：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">A 通过上拉电阻接到 VCC</span><br><span class="line">B 通过下拉电阻接到 GND</span><br></pre></td></tr></table></figure>
+
+<p>现在很多 RS485 收发器内部已经带有 fail-safe 功能，但实际工业项目中仍然需要结合芯片手册和现场布线设计。</p>
+<h3 id="6-6-RS485-调试注意事项"><a href="#6-6-RS485-调试注意事项" class="headerlink" title="6.6 RS485 调试注意事项"></a>6.6 RS485 调试注意事项</h3><p>RS485 调试时常见问题：</p>
+<ol>
+<li><p>A&#x2F;B 接反。<br>表现为完全收不到数据，或者数据异常。</p>
+</li>
+<li><p>方向控制 DE&#x2F;RE 时序错误。<br>表现为只能收不能发、只能发不能收，或者最后一个字节丢失。</p>
+</li>
+<li><p>没有共地。<br>虽然 RS485 是差分信号，但强干扰或远距离场景仍建议连接参考地，避免共模电压超出收发器范围。</p>
+</li>
+<li><p>终端电阻使用不当。<br>短距离低速调试可以不加，但长距离或高速通信建议在总线两端加 120Ω。</p>
+</li>
+<li><p>多个设备同时发送。<br>半双工 RS485 总线上如果多个节点同时发送，会产生总线冲突。</p>
+</li>
+<li><p>波特率或协议参数不一致。<br>比如 Modbus RTU 中常见 <code>9600 8N1</code>、<code>9600 8E1</code>，主从设备必须一致。</p>
+</li>
+<li><p>使用普通 UART 调试助手直接接 RS485。<br>PC 端需要 USB 转 RS485 模块，不能用 USB 转 TTL 模块直接接 A&#x2F;B 线。</p>
+</li>
+</ol>
+<h3 id="6-7-RS485-和-Modbus-RTU-的关系"><a href="#6-7-RS485-和-Modbus-RTU-的关系" class="headerlink" title="6.7 RS485 和 Modbus RTU 的关系"></a>6.7 RS485 和 Modbus RTU 的关系</h3><p>RS485 只是电气层，Modbus RTU 是常见的上层通信协议。<br>很多工业设备说“485 通信”，实际通常指：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">物理层：RS485</span><br><span class="line">链路/应用层：Modbus RTU 或厂家自定义协议</span><br></pre></td></tr></table></figure>
+
+<p>Modbus RTU 帧一般包括：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">从机地址 + 功能码 + 数据区 + CRC16</span><br></pre></td></tr></table></figure>
+
+<p>例如主机读取从机寄存器时，会通过 RS485 总线发送一帧 Modbus RTU 请求，从机解析地址和功能码后返回数据。</p>
+<hr>
+<h2 id="7、IMX6U-中的串口配置"><a href="#7、IMX6U-中的串口配置" class="headerlink" title="7、IMX6U 中的串口配置"></a>7、IMX6U 中的串口配置</h2><h3 id="7-1-接收和发送寄存器"><a href="#7-1-接收和发送寄存器" class="headerlink" title="7.1 接收和发送寄存器"></a>7.1 接收和发送寄存器</h3><ul>
+<li><code>UART_URXD</code> 寄存器保存串口接收到的数据。</li>
+<li><code>UART_UTXD</code> 寄存器是发送数据寄存器。如果需要通过串口发送数据，只需要将数据写入 <code>UART_UTXD</code> 寄存器。</li>
+</ul>
+<h3 id="7-2-控制寄存器"><a href="#7-2-控制寄存器" class="headerlink" title="7.2 控制寄存器"></a>7.2 控制寄存器</h3><p><code>UART_UCR1</code> ~ <code>UART_UCR4</code> 都是串口控制寄存器。</p>
+<p><code>UART_UCR1</code> 常用位：</p>
+<ul>
+<li>bit0：UART 使能位。为 1 时使能 UART。</li>
+<li>bit14：自动检测波特率使能位。为 1 时使能波特率自动检测。</li>
+</ul>
+<p><code>UART_UCR2</code> 常用位：</p>
+<ul>
+<li>bit0：软件复位位。为 0 时复位 UART。</li>
+<li>bit1：接收使能位，需要配置为 1。</li>
+<li>bit2：发送使能位，需要配置为 1。</li>
+<li>bit5：数据位设置。0 表示 7 位数据位，1 表示 8 位数据位。</li>
+<li>bit6：停止位设置。0 表示 1 位停止位，1 表示 2 位停止位。</li>
+<li>bit7：奇偶校验类型。0 表示偶校验，1 表示奇校验。</li>
+<li>bit8：校验使能位。0 表示关闭校验。</li>
+</ul>
+<p>注意：<br><code>UART_UCR3</code> 的 bit2 必须设置为 1，这是官方手册中特别提示的 Note，配置时不要遗漏。</p>
+<h3 id="7-3-UART-时钟配置"><a href="#7-3-UART-时钟配置" class="headerlink" title="7.3 UART 时钟配置"></a>7.3 UART 时钟配置</h3><p><code>UART_UFCR</code> 寄存器的 bit9~bit7 用于设置分频值。<br>UART 的时钟源可以来自 PLL3 分频：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">PLL3 / 6 = 480 MHz / 6 = 80 MHz</span><br></pre></td></tr></table></figure>
+
+<p><code>CSCDR1</code> 寄存器中的相关位：</p>
+<ul>
+<li><code>UART_CLK_SEL</code>：设置 UART 时钟源。为 0 时 UART 时钟为 80MHz；为 1 时 UART 时钟源为 24MHz 晶振。</li>
+<li><code>UART_CLK_PODF</code>：控制 UART 时钟分频。一般设置为 1 分频。</li>
+</ul>
+<p>因此常见配置下：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">UART_CLK_ROOT = 80 MHz</span><br></pre></td></tr></table></figure>
+
+<h3 id="7-4-波特率相关寄存器"><a href="#7-4-波特率相关寄存器" class="headerlink" title="7.4 波特率相关寄存器"></a>7.4 波特率相关寄存器</h3><p>UART 波特率主要由以下寄存器共同决定：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">UART_UFCR</span><br><span class="line">UART_UBIR</span><br><span class="line">UART_UBMR</span><br></pre></td></tr></table></figure>
+
+<p>配置波特率时，需要根据 UART 根时钟、分频系数和目标波特率计算寄存器值。<br>在裸机开发中需要手动配置这些寄存器；在 Linux 驱动中，内核串口驱动会完成这些计算和配置。</p>
+<h3 id="7-5-状态寄存器"><a href="#7-5-状态寄存器" class="headerlink" title="7.5 状态寄存器"></a>7.5 状态寄存器</h3><p><code>UART_USR2</code> 常用位：</p>
+<ul>
+<li>bit0：为 1 时表示有数据可以读取。</li>
+<li>bit3：为 1 时表示数据发送完成。</li>
+</ul>
+<p>发送 RS485 数据时，尤其要注意“发送完成”和“发送 FIFO 空”不是同一个概念。<br>半双工 RS485 切换方向时，应确保移位寄存器中的最后一位也已经真正发送完成。</p>
+<hr>
+<h2 id="8、IMX6U-串口开发流程"><a href="#8、IMX6U-串口开发流程" class="headerlink" title="8、IMX6U 串口开发流程"></a>8、IMX6U 串口开发流程</h2><h3 id="8-1-裸机开发流程"><a href="#8-1-裸机开发流程" class="headerlink" title="8.1 裸机开发流程"></a>8.1 裸机开发流程</h3><p>裸机配置 UART 的大致步骤如下：</p>
+<ol>
+<li>使能 UART 外设时钟。</li>
+<li>配置 UART TXD&#x2F;RXD 引脚复用功能。</li>
+<li>配置引脚电气属性，比如上下拉、驱动能力、速度等。</li>
+<li>复位 UART 控制器。</li>
+<li>配置数据位、停止位、校验位。</li>
+<li>配置波特率。</li>
+<li>使能 UART 发送和接收。</li>
+<li>通过状态寄存器查询收发状态。</li>
+<li>读 <code>UART_URXD</code> 接收数据，写 <code>UART_UTXD</code> 发送数据。</li>
+</ol>
+<h3 id="8-2-Linux-下使用串口"><a href="#8-2-Linux-下使用串口" class="headerlink" title="8.2 Linux 下使用串口"></a>8.2 Linux 下使用串口</h3><p>在 Linux 系统中，串口通常表现为设备文件：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">/dev/ttymxc0</span><br><span class="line">/dev/ttymxc1</span><br><span class="line">/dev/ttymxc2</span><br></pre></td></tr></table></figure>
+
+<p>常用调试命令：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">dmesg | grep <span class="built_in">tty</span></span><br><span class="line"><span class="built_in">ls</span> /dev/tty*</span><br><span class="line"><span class="built_in">stty</span> -F /dev/ttymxc1 115200 cs8 -cstopb -parenb</span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;hello&quot;</span> &gt; /dev/ttymxc1</span><br><span class="line"><span class="built_in">cat</span> /dev/ttymxc1</span><br></pre></td></tr></table></figure>
+
+<p>如果需要使用 RS485，Linux 下通常有两种方式：</p>
+<ol>
+<li><p>应用层自己控制 GPIO 方向。<br>发送前拉高 DE，发送完成后拉低 DE。</p>
+</li>
+<li><p>使用内核 RS485 模式。<br>如果对应 UART 驱动支持 <code>TIOCSRS485</code>，可以由内核自动控制 RTS&#x2F;DE 方向。</p>
+</li>
+</ol>
+<p>在工业项目中，更推荐使用内核提供的 RS485 支持，因为它更容易保证发送完成和方向切换时序。</p>
+<hr>
+<h2 id="9、常见串口硬件连接总结"><a href="#9、常见串口硬件连接总结" class="headerlink" title="9、常见串口硬件连接总结"></a>9、常见串口硬件连接总结</h2><h3 id="9-1-i-MX6ULL-接-USB-转-TTL"><a href="#9-1-i-MX6ULL-接-USB-转-TTL" class="headerlink" title="9.1 i.MX6ULL 接 USB 转 TTL"></a>9.1 i.MX6ULL 接 USB 转 TTL</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">i.MX6ULL TXD  ---&gt;  USB-TTL RXD</span><br><span class="line">i.MX6ULL RXD  &lt;---  USB-TTL TXD</span><br><span class="line">i.MX6ULL GND  ---   USB-TTL GND</span><br></pre></td></tr></table></figure>
+
+<p>注意选择 3.3V TTL。</p>
+<h3 id="9-2-i-MX6ULL-接-RS232-设备"><a href="#9-2-i-MX6ULL-接-RS232-设备" class="headerlink" title="9.2 i.MX6ULL 接 RS232 设备"></a>9.2 i.MX6ULL 接 RS232 设备</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">i.MX6ULL UART_TXD/RXD</span><br><span class="line">        |</span><br><span class="line">        |  TTL/CMOS 电平</span><br><span class="line">        v</span><br><span class="line">MAX3232 等 RS232 转换芯片</span><br><span class="line">        |</span><br><span class="line">        |  RS232 电平</span><br><span class="line">        v</span><br><span class="line">RS232 设备</span><br></pre></td></tr></table></figure>
+
+<p>不能把 i.MX6ULL 的 UART_TXD&#x2F;RXD 直接接到 RS232 DB9 接口。</p>
+<h3 id="9-3-i-MX6ULL-接-RS485-设备"><a href="#9-3-i-MX6ULL-接-RS485-设备" class="headerlink" title="9.3 i.MX6ULL 接 RS485 设备"></a>9.3 i.MX6ULL 接 RS485 设备</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">i.MX6ULL UART_TXD  ---&gt;  RS485 收发器 DI</span><br><span class="line">i.MX6ULL UART_RXD  &lt;---  RS485 收发器 RO</span><br><span class="line">i.MX6ULL GPIO      ---&gt;  RS485 收发器 DE 和 /RE</span><br><span class="line">RS485 收发器 A/B   &lt;--&gt;  RS485 总线 A/B</span><br></pre></td></tr></table></figure>
+
+<p>RS485 总线两端根据距离和速率决定是否加 120Ω 终端电阻。<br>如果是多节点通信，需要保证同一时刻只有一个节点发送。</p>
+<hr>
+<h2 id="10、串口问题排查清单"><a href="#10、串口问题排查清单" class="headerlink" title="10、串口问题排查清单"></a>10、串口问题排查清单</h2><h3 id="10-1-无输出"><a href="#10-1-无输出" class="headerlink" title="10.1 无输出"></a>10.1 无输出</h3><ul>
+<li>UART 时钟是否使能。</li>
+<li>引脚复用是否配置为 UART 功能。</li>
+<li>TXD 管脚是否接到对方 RXD。</li>
+<li>GND 是否共地。</li>
+<li>串口号是否选错。</li>
+<li>波特率是否配置正确。</li>
+<li>Linux 下设备树是否启用了对应 UART 节点。</li>
+</ul>
+<h3 id="10-2-乱码"><a href="#10-2-乱码" class="headerlink" title="10.2 乱码"></a>10.2 乱码</h3><ul>
+<li>波特率不一致。</li>
+<li>数据位、校验位、停止位配置不一致。</li>
+<li>TTL 电平不匹配，比如 3.3V 和 5V 混用。</li>
+<li>GND 没有共地。</li>
+<li>线太长或干扰太强。</li>
+<li>RS485 A&#x2F;B 接反或总线终端不合理。</li>
+</ul>
+<h3 id="10-3-能发不能收"><a href="#10-3-能发不能收" class="headerlink" title="10.3 能发不能收"></a>10.3 能发不能收</h3><ul>
+<li>RXD 管脚复用错误。</li>
+<li>TXD&#x2F;RXD 没有交叉连接。</li>
+<li>接收使能位没有打开。</li>
+<li>RS485 的 &#x2F;RE 没有打开。</li>
+<li>对方设备没有发送数据。</li>
+<li>上层协议地址不匹配，比如 Modbus 从机地址错误。</li>
+</ul>
+<h3 id="10-4-能收不能发"><a href="#10-4-能收不能发" class="headerlink" title="10.4 能收不能发"></a>10.4 能收不能发</h3><ul>
+<li>TXD 管脚复用错误。</li>
+<li>发送使能位没有打开。</li>
+<li>RS485 的 DE 没有打开。</li>
+<li>发送后方向切换过早。</li>
+<li>对方接收端波特率或协议参数不匹配。</li>
+</ul>
+<hr>
+<h2 id="11、NOTE：Linux-内核和-U-Boot-中为什么不使用浮点"><a href="#11、NOTE：Linux-内核和-U-Boot-中为什么不使用浮点" class="headerlink" title="11、NOTE：Linux 内核和 U-Boot 中为什么不使用浮点"></a>11、NOTE：Linux 内核和 U-Boot 中为什么不使用浮点</h2><p>对于 Linux 内核和 U-Boot 等系统级软件，“不使用浮点”是一个强制且广泛遵守的约定。</p>
+<h3 id="11-1-性能代价高"><a href="#11-1-性能代价高" class="headerlink" title="11.1 性能代价高"></a>11.1 性能代价高</h3><p>浮点运算单元 FPU 拥有一组独立且数量较多的寄存器。<br>例如 ARM 架构中，FPU&#x2F;NEON 相关寄存器体积较大。任务切换时，如果允许内核随意使用 FPU，操作系统就必须保存和恢复这些额外寄存器。</p>
+<p>这会增加上下文切换开销，影响系统实时性和整体性能。</p>
+<h3 id="11-2-状态管理复杂"><a href="#11-2-状态管理复杂" class="headerlink" title="11.2 状态管理复杂"></a>11.2 状态管理复杂</h3><p>操作系统通常会对用户态 FPU 使用进行延迟保存或按需保存，以减少性能损耗。<br>但是内核代码运行在特殊上下文中，可能发生在中断、异常、调度等关键路径上。如果内核随意使用 FPU，会破坏原有 FPU 状态管理逻辑，导致难以排查的问题。</p>
+<h3 id="11-3-可移植性和确定性更差"><a href="#11-3-可移植性和确定性更差" class="headerlink" title="11.3 可移植性和确定性更差"></a>11.3 可移植性和确定性更差</h3><p>系统级代码更强调确定性、可移植性和可控性。<br>浮点运算在不同编译器、不同 FPU 配置和不同优化选项下可能带来额外差异。因此内核、Bootloader 等底层软件通常使用整数运算、定点数或移位运算来替代浮点运算。</p>
+<hr>
+<h2 id="12、总结"><a href="#12、总结" class="headerlink" title="12、总结"></a>12、总结</h2><p>串口学习时要把 UART 协议和电气层标准区分开：</p>
+<ul>
+<li>UART 关注数据帧格式，例如起始位、数据位、校验位、停止位和波特率。</li>
+<li>TTL 串口适合短距离板级调试，i.MX6ULL 的 UART 管脚通常就是 TTL&#x2F;CMOS 电平。</li>
+<li>RS232 使用正负电压，不能和 TTL UART 直接相连，需要 MAX3232 等转换芯片。</li>
+<li>RS485 使用差分信号，适合长距离和工业现场，需要 RS485 收发器，并且半双工场景下要控制 DE&#x2F;RE 方向。</li>
+<li>串口调试时，先检查电平标准，再检查接线，最后检查波特率和软件配置。</li>
+</ul>
+<p>对于 i.MX6ULL 开发来说，最常见的调试方式是 USB 转 3.3V TTL 串口；如果要连接工业设备，则通常需要根据设备接口选择 RS232 或 RS485 转换电路。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Linux%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/" rel="tag"># Linux驱动开发</a>
+              <a href="/tags/%E8%A3%B8%E6%9C%BA%E5%BC%80%E5%8F%91/" rel="tag"># 裸机开发</a>
+              <a href="/tags/%E9%80%9A%E4%BF%A1%E5%8D%8F%E8%AE%AE/" rel="tag"># 通信协议</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/06/17/%E8%A3%B8%E6%9C%BA%E9%A9%B1%E5%8A%A8%E4%B9%8BEPIT%E5%92%8CGPT%E5%AE%9A%E6%97%B6%E5%99%A8/" rel="prev" title="裸机驱动开发之EPIT 和 GPT 定时器">
+      <i class="fa fa-chevron-left"></i> 裸机驱动开发之EPIT 和 GPT 定时器
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2026/06/18/%E8%A3%B8%E6%9C%BA%E9%A9%B1%E5%8A%A8%E4%B9%8BDDR/" rel="next" title="裸机驱动开发之DDR">
+      裸机驱动开发之DDR <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#IMX6U-%E4%B8%B2%E5%8F%A3%E5%AD%A6%E4%B9%A0%E4%B8%8E%E4%BD%BF%E7%94%A8"><span class="nav-number">1.</span> <span class="nav-text">IMX6U 串口学习与使用</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1%E3%80%81%E4%B8%B2%E5%8F%A3%E5%9F%BA%E7%A1%80%E6%A6%82%E5%BF%B5"><span class="nav-number">1.1.</span> <span class="nav-text">1、串口基础概念</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2%E3%80%81%E4%B8%B2%E5%8F%A3%E6%95%B0%E6%8D%AE%E6%A0%BC%E5%BC%8F"><span class="nav-number">1.2.</span> <span class="nav-text">2、串口数据格式</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E7%A9%BA%E9%97%B2%E4%BD%8D"><span class="nav-number">1.2.1.</span> <span class="nav-text">2.1 空闲位</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-%E8%B5%B7%E5%A7%8B%E4%BD%8D"><span class="nav-number">1.2.2.</span> <span class="nav-text">2.2 起始位</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-%E6%95%B0%E6%8D%AE%E4%BD%8D"><span class="nav-number">1.2.3.</span> <span class="nav-text">2.3 数据位</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4-%E5%A5%87%E5%81%B6%E6%A0%A1%E9%AA%8C%E4%BD%8D"><span class="nav-number">1.2.4.</span> <span class="nav-text">2.4 奇偶校验位</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-5-%E5%81%9C%E6%AD%A2%E4%BD%8D"><span class="nav-number">1.2.5.</span> <span class="nav-text">2.5 停止位</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-6-%E6%B3%A2%E7%89%B9%E7%8E%87"><span class="nav-number">1.2.6.</span> <span class="nav-text">2.6 波特率</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3%E3%80%81TTL-%E7%94%B5%E5%B9%B3%E3%80%81RS232-%E7%94%B5%E5%B9%B3%E5%92%8C-RS485-%E7%94%B5%E5%B9%B3"><span class="nav-number">1.3.</span> <span class="nav-text">3、TTL 电平、RS232 电平和 RS485 电平</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E5%8C%BA%E5%88%86%E7%94%B5%E5%B9%B3%E6%A0%87%E5%87%86"><span class="nav-number">1.3.1.</span> <span class="nav-text">3.1 为什么要区分电平标准</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4%E3%80%81TTL-%E7%94%B5%E5%B9%B3%E4%B8%B2%E5%8F%A3"><span class="nav-number">1.4.</span> <span class="nav-text">4、TTL 电平串口</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-TTL-%E7%94%B5%E5%B9%B3%E4%B8%B2%E5%8F%A3%E7%9A%84%E7%89%B9%E7%82%B9"><span class="nav-number">1.4.1.</span> <span class="nav-text">4.1 TTL 电平串口的特点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-TTL-%E7%94%B5%E5%B9%B3%E8%8C%83%E5%9B%B4"><span class="nav-number">1.4.2.</span> <span class="nav-text">4.2 TTL 电平范围</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-3-i-MX6ULL-%E4%B8%B2%E5%8F%A3%E7%94%B5%E5%B9%B3%E6%B3%A8%E6%84%8F%E4%BA%8B%E9%A1%B9"><span class="nav-number">1.4.3.</span> <span class="nav-text">4.3 i.MX6ULL 串口电平注意事项</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-4-TTL-%E4%B8%B2%E5%8F%A3%E6%8E%A5%E7%BA%BF%E6%96%B9%E5%BC%8F"><span class="nav-number">1.4.4.</span> <span class="nav-text">4.4 TTL 串口接线方式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-5-TTL-%E4%B8%B2%E5%8F%A3%E8%B0%83%E8%AF%95%E5%BB%BA%E8%AE%AE"><span class="nav-number">1.4.5.</span> <span class="nav-text">4.5 TTL 串口调试建议</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5%E3%80%81RS232-%E7%94%B5%E5%B9%B3%E4%B8%B2%E5%8F%A3"><span class="nav-number">1.5.</span> <span class="nav-text">5、RS232 电平串口</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-RS232-%E7%9A%84%E7%89%B9%E7%82%B9"><span class="nav-number">1.5.1.</span> <span class="nav-text">5.1 RS232 的特点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-RS232-%E7%94%B5%E5%B9%B3%E9%80%BB%E8%BE%91"><span class="nav-number">1.5.2.</span> <span class="nav-text">5.2 RS232 电平逻辑</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6%E3%80%81RS485-%E7%94%B5%E5%B9%B3%E4%B8%B2%E5%8F%A3"><span class="nav-number">1.6.</span> <span class="nav-text">6、RS485 电平串口</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-RS485-%E6%98%AF%E4%BB%80%E4%B9%88"><span class="nav-number">1.6.1.</span> <span class="nav-text">6.1 RS485 是什么</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-RS485-%E5%B7%AE%E5%88%86%E4%BF%A1%E5%8F%B7"><span class="nav-number">1.6.2.</span> <span class="nav-text">6.2 RS485 差分信号</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-3-RS485-%E4%B8%8E-TTL-%E7%9A%84%E5%8C%BA%E5%88%AB"><span class="nav-number">1.6.3.</span> <span class="nav-text">6.3 RS485 与 TTL 的区别</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-4-RS485-%E5%8D%8A%E5%8F%8C%E5%B7%A5%E5%92%8C%E5%85%A8%E5%8F%8C%E5%B7%A5"><span class="nav-number">1.6.4.</span> <span class="nav-text">6.4 RS485 半双工和全双工</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-5-RS485-%E7%BB%88%E7%AB%AF%E7%94%B5%E9%98%BB%E5%92%8C%E5%81%8F%E7%BD%AE%E7%94%B5%E9%98%BB"><span class="nav-number">1.6.5.</span> <span class="nav-text">6.5 RS485 终端电阻和偏置电阻</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-6-RS485-%E8%B0%83%E8%AF%95%E6%B3%A8%E6%84%8F%E4%BA%8B%E9%A1%B9"><span class="nav-number">1.6.6.</span> <span class="nav-text">6.6 RS485 调试注意事项</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-7-RS485-%E5%92%8C-Modbus-RTU-%E7%9A%84%E5%85%B3%E7%B3%BB"><span class="nav-number">1.6.7.</span> <span class="nav-text">6.7 RS485 和 Modbus RTU 的关系</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7%E3%80%81IMX6U-%E4%B8%AD%E7%9A%84%E4%B8%B2%E5%8F%A3%E9%85%8D%E7%BD%AE"><span class="nav-number">1.7.</span> <span class="nav-text">7、IMX6U 中的串口配置</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#7-1-%E6%8E%A5%E6%94%B6%E5%92%8C%E5%8F%91%E9%80%81%E5%AF%84%E5%AD%98%E5%99%A8"><span class="nav-number">1.7.1.</span> <span class="nav-text">7.1 接收和发送寄存器</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-2-%E6%8E%A7%E5%88%B6%E5%AF%84%E5%AD%98%E5%99%A8"><span class="nav-number">1.7.2.</span> <span class="nav-text">7.2 控制寄存器</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-3-UART-%E6%97%B6%E9%92%9F%E9%85%8D%E7%BD%AE"><span class="nav-number">1.7.3.</span> <span class="nav-text">7.3 UART 时钟配置</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-4-%E6%B3%A2%E7%89%B9%E7%8E%87%E7%9B%B8%E5%85%B3%E5%AF%84%E5%AD%98%E5%99%A8"><span class="nav-number">1.7.4.</span> <span class="nav-text">7.4 波特率相关寄存器</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#7-5-%E7%8A%B6%E6%80%81%E5%AF%84%E5%AD%98%E5%99%A8"><span class="nav-number">1.7.5.</span> <span class="nav-text">7.5 状态寄存器</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#8%E3%80%81IMX6U-%E4%B8%B2%E5%8F%A3%E5%BC%80%E5%8F%91%E6%B5%81%E7%A8%8B"><span class="nav-number">1.8.</span> <span class="nav-text">8、IMX6U 串口开发流程</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#8-1-%E8%A3%B8%E6%9C%BA%E5%BC%80%E5%8F%91%E6%B5%81%E7%A8%8B"><span class="nav-number">1.8.1.</span> <span class="nav-text">8.1 裸机开发流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#8-2-Linux-%E4%B8%8B%E4%BD%BF%E7%94%A8%E4%B8%B2%E5%8F%A3"><span class="nav-number">1.8.2.</span> <span class="nav-text">8.2 Linux 下使用串口</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#9%E3%80%81%E5%B8%B8%E8%A7%81%E4%B8%B2%E5%8F%A3%E7%A1%AC%E4%BB%B6%E8%BF%9E%E6%8E%A5%E6%80%BB%E7%BB%93"><span class="nav-number">1.9.</span> <span class="nav-text">9、常见串口硬件连接总结</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#9-1-i-MX6ULL-%E6%8E%A5-USB-%E8%BD%AC-TTL"><span class="nav-number">1.9.1.</span> <span class="nav-text">9.1 i.MX6ULL 接 USB 转 TTL</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#9-2-i-MX6ULL-%E6%8E%A5-RS232-%E8%AE%BE%E5%A4%87"><span class="nav-number">1.9.2.</span> <span class="nav-text">9.2 i.MX6ULL 接 RS232 设备</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#9-3-i-MX6ULL-%E6%8E%A5-RS485-%E8%AE%BE%E5%A4%87"><span class="nav-number">1.9.3.</span> <span class="nav-text">9.3 i.MX6ULL 接 RS485 设备</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#10%E3%80%81%E4%B8%B2%E5%8F%A3%E9%97%AE%E9%A2%98%E6%8E%92%E6%9F%A5%E6%B8%85%E5%8D%95"><span class="nav-number">1.10.</span> <span class="nav-text">10、串口问题排查清单</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#10-1-%E6%97%A0%E8%BE%93%E5%87%BA"><span class="nav-number">1.10.1.</span> <span class="nav-text">10.1 无输出</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#10-2-%E4%B9%B1%E7%A0%81"><span class="nav-number">1.10.2.</span> <span class="nav-text">10.2 乱码</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#10-3-%E8%83%BD%E5%8F%91%E4%B8%8D%E8%83%BD%E6%94%B6"><span class="nav-number">1.10.3.</span> <span class="nav-text">10.3 能发不能收</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#10-4-%E8%83%BD%E6%94%B6%E4%B8%8D%E8%83%BD%E5%8F%91"><span class="nav-number">1.10.4.</span> <span class="nav-text">10.4 能收不能发</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#11%E3%80%81NOTE%EF%BC%9ALinux-%E5%86%85%E6%A0%B8%E5%92%8C-U-Boot-%E4%B8%AD%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E4%BD%BF%E7%94%A8%E6%B5%AE%E7%82%B9"><span class="nav-number">1.11.</span> <span class="nav-text">11、NOTE：Linux 内核和 U-Boot 中为什么不使用浮点</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#11-1-%E6%80%A7%E8%83%BD%E4%BB%A3%E4%BB%B7%E9%AB%98"><span class="nav-number">1.11.1.</span> <span class="nav-text">11.1 性能代价高</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#11-2-%E7%8A%B6%E6%80%81%E7%AE%A1%E7%90%86%E5%A4%8D%E6%9D%82"><span class="nav-number">1.11.2.</span> <span class="nav-text">11.2 状态管理复杂</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#11-3-%E5%8F%AF%E7%A7%BB%E6%A4%8D%E6%80%A7%E5%92%8C%E7%A1%AE%E5%AE%9A%E6%80%A7%E6%9B%B4%E5%B7%AE"><span class="nav-number">1.11.3.</span> <span class="nav-text">11.3 可移植性和确定性更差</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#12%E3%80%81%E6%80%BB%E7%BB%93"><span class="nav-number">1.12.</span> <span class="nav-text">12、总结</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Huiting_Yang"
+      src="/images/troye.jpg">
+  <p class="site-author-name" itemprop="name">Huiting_Yang</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">20</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">13</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Huiting_Yang</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/pangu@4/dist/browser/pangu.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+<script src="/js/bookmark.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>

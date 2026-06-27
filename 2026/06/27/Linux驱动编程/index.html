@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 8.1.2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"troyeeee673.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":"default"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":true,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":true,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="一、Linux驱动开发核心思想在进行Linux驱动开发时，需要建立以下核心思想，这与裸机开发有本质区别：  避免直接操作寄存器：Linux运行在带MMU（内存管理单元）的处理器上，操作的是虚拟地址，直接操作物理寄存器地址是不现实的，也是不被允许的。 遵循驱动框架：Linux内核为各类设备提供了成熟的驱动框架（如字符设备、块设备、网络设备、平台设备等）。开发驱动必须遵循对应的框架，理解并填充框架要求">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Linux系统驱动开发之字符设备驱动开发和pinctl、gpio子系统">
+<meta property="og:url" content="https://troyeeee673.github.io/2026/06/27/Linux%E9%A9%B1%E5%8A%A8%E7%BC%96%E7%A8%8B/index.html">
+<meta property="og:site_name" content="Linux系统编程">
+<meta property="og:description" content="一、Linux驱动开发核心思想在进行Linux驱动开发时，需要建立以下核心思想，这与裸机开发有本质区别：  避免直接操作寄存器：Linux运行在带MMU（内存管理单元）的处理器上，操作的是虚拟地址，直接操作物理寄存器地址是不现实的，也是不被允许的。 遵循驱动框架：Linux内核为各类设备提供了成熟的驱动框架（如字符设备、块设备、网络设备、平台设备等）。开发驱动必须遵循对应的框架，理解并填充框架要求">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-06-27T14:26:04.000Z">
+<meta property="article:modified_time" content="2026-06-27T14:34:26.690Z">
+<meta property="article:author" content="Huiting_Yang">
+<meta property="article:tag" content="Linux系统驱动开发">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://troyeeee673.github.io/2026/06/27/Linux%E9%A9%B1%E5%8A%A8%E7%BC%96%E7%A8%8B/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Linux系统驱动开发之字符设备驱动开发和pinctl、gpio子系统 | Linux系统编程</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Linux系统编程" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Linux系统编程</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fth fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
+
+  <a href="https://github.com/yourname" class="github-corner" title="Follow me on GitHub" aria-label="Follow me on GitHub" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://troyeeee673.github.io/2026/06/27/Linux%E9%A9%B1%E5%8A%A8%E7%BC%96%E7%A8%8B/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/troye.jpg">
+      <meta itemprop="name" content="Huiting_Yang">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Linux系统编程">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Linux系统驱动开发之字符设备驱动开发和pinctl、gpio子系统
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-06-27 22:26:04 / 修改时间：22:34:26" itemprop="dateCreated datePublished" datetime="2026-06-27T22:26:04+08:00">2026-06-27</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux%E7%B3%BB%E7%BB%9F%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/" itemprop="url" rel="index"><span itemprop="name">Linux系统驱动开发</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h3 id="一、Linux驱动开发核心思想"><a href="#一、Linux驱动开发核心思想" class="headerlink" title="一、Linux驱动开发核心思想"></a>一、Linux驱动开发核心思想</h3><p>在进行Linux驱动开发时，需要建立以下核心思想，这与裸机开发有本质区别：</p>
+<ol>
+<li><strong>避免直接操作寄存器</strong>：Linux运行在带MMU（内存管理单元）的处理器上，操作的是虚拟地址，直接操作物理寄存器地址是不现实的，也是不被允许的。</li>
+<li><strong>遵循驱动框架</strong>：Linux内核为各类设备提供了成熟的驱动框架（如字符设备、块设备、网络设备、平台设备等）。开发驱动必须遵循对应的框架，理解并填充框架要求的接口和数据结构。</li>
+<li><strong>一切皆文件</strong>：驱动的最终表现就是<code>/dev</code>目录下的设备文件（如<code>/dev/led</code>）。应用程序通过标准的文件操作API（<code>open</code>, <code>close</code>, <code>read</code>, <code>write</code>等）来访问和控制硬件。</li>
+<li><strong>设备树（Device Tree）</strong>：在现代Linux内核中，硬件信息（如外设连接在哪个总线、使用哪个引脚）通过<code>.dts</code>文件（设备树源文件）描述，而非硬编码在内核中。驱动通过标准接口从设备树中获取硬件信息。</li>
+</ol>
+<h3 id="二、Linux驱动开发分类"><a href="#二、Linux驱动开发分类" class="headerlink" title="二、Linux驱动开发分类"></a>二、Linux驱动开发分类</h3><p>Linux驱动主要分为三大类，每一类都对应一套独立的框架体系：</p>
+<ol>
+<li><strong>字符设备驱动</strong>：这是最常见、最基础的一类驱动，适用于大多数按字节流进行操作的简单外设，如LED灯、按键、串口、传感器等。</li>
+<li><strong>块设备驱动</strong>：主要针对存储设备，如eMMC、SD卡、硬盘等，数据按块进行存取，涉及复杂的缓冲和I&#x2F;O调度机制。</li>
+<li><strong>网络设备驱动</strong>：面向网络通信设备，如以太网卡、Wi-Fi模块等。它与字符&#x2F;块设备不同，其通信基于网络协议栈，使用套接字（Socket）接口，而非设备文件。</li>
+</ol>
+<hr>
+<h3 id="三、字符设备驱动开发基础"><a href="#三、字符设备驱动开发基础" class="headerlink" title="三、字符设备驱动开发基础"></a>三、字符设备驱动开发基础</h3><h4 id="1-应用程序与驱动的交互原理"><a href="#1-应用程序与驱动的交互原理" class="headerlink" title="1. 应用程序与驱动的交互原理"></a>1. 应用程序与驱动的交互原理</h4><p>驱动开发的本质是实现硬件操作，并向应用层提供统一接口。</p>
+<ul>
+<li><strong>驱动与应用的分离</strong>：驱动运行在内核空间，负责直接控制硬件；应用程序运行在用户空间，通过调用驱动暴露的接口来使用硬件能力。</li>
+<li><strong>用户空间与内核空间的交互流程</strong>：<ol>
+<li>应用程序调用C库提供的API函数（如<code>fopen</code>, <code>fwrite</code>等，遵循POSIX标准）。</li>
+<li>C库函数内部会触发一个<strong>软中断</strong>（陷入），使CPU从用户模式切换到内核模式。</li>
+<li>内核根据<strong>系统调用号</strong>找到对应的服务函数（如<code>sys_open</code>），进而调用到驱动程序中实现的<code>open</code>函数。</li>
+</ol>
+</li>
+</ul>
+<blockquote>
+<p>补充理解：每个系统调用都有一个唯一的系统调用号，内核通过这个号来区分不同的请求（如<code>open</code>、<code>read</code>、<code>write</code>等）。</p>
+</blockquote>
+<h4 id="2-字符设备驱动开发流程"><a href="#2-字符设备驱动开发流程" class="headerlink" title="2. 字符设备驱动开发流程"></a>2. 字符设备驱动开发流程</h4><p>Linux内核将设备抽象为文件，并提供<code>file_operations</code>结构体来建立应用层文件操作与驱动层函数实现之间的映射关系。</p>
+<ul>
+<li><strong><code>file_operations</code>结构体</strong>：这是字符设备驱动的核心。驱动开发者需要实现如<code>open</code>， <code>release</code>， <code>read</code>， <code>write</code>， <code>unlocked_ioctl</code>等函数，然后将这些函数的指针赋值给<code>file_operations</code>结构体的成员。</li>
+<li><strong>映射原理</strong>：当应用程序对<code>/dev/led</code>设备文件调用<code>open()</code>时，内核VFS（虚拟文件系统）会找到该设备文件关联的<code>file_operations</code>结构体，并执行其中的<code>.open</code>指向的驱动函数。</li>
+</ul>
+<p><strong>开发提示：</strong></p>
+<ul>
+<li>驱动最终是被应用调用的，在写驱动的时候要考虑应用开发的便利性。</li>
+<li>对于字符设备驱动来说，重点就是编写应用程序对应的<code>open</code>、<code>close</code>、<code>read</code>、<code>write</code>等函数，也就是对<code>file_operations</code>中函数的实现。</li>
+</ul>
+<h5 id="（1）字符设备驱动框架"><a href="#（1）字符设备驱动框架" class="headerlink" title="（1）字符设备驱动框架"></a>（1）字符设备驱动框架</h5><p>驱动框架主要体现在对<code>file_operations</code>结构体中<code>open</code>, <code>close</code>, <code>read</code>, <code>write</code>等标准接口的具体实现。</p>
+<h5 id="（2）驱动模块的加载与卸载"><a href="#（2）驱动模块的加载与卸载" class="headerlink" title="（2）驱动模块的加载与卸载"></a>（2）驱动模块的加载与卸载</h5><p>Linux驱动可以编译为内核的一部分，但更常见的做法是编译为内核模块（<code>.ko</code>文件），这样可以动态加载和卸载。</p>
+<ul>
+<li><strong>加载驱动</strong>：使用<code>insmod</code>或<code>modprobe</code>命令。驱动模块加载时，会执行<code>module_init</code>宏指定的初始化函数。</li>
+<li><strong>卸载驱动</strong>：使用<code>rmmod</code>命令。卸载时，会执行<code>module_exit</code>宏指定的清理函数。</li>
+</ul>
+<h5 id="（3）字符设备的注册与注销"><a href="#（3）字符设备的注册与注销" class="headerlink" title="（3）字符设备的注册与注销"></a>（3）字符设备的注册与注销</h5><p>内核通过设备号来识别设备。驱动加载时需要向内核注册设备，卸载时需要注销。</p>
+<ul>
+<li><strong>注册设备</strong>：使用<code>register_chrdev</code>函数向系统注册一个字符设备。</li>
+<li><strong>注销设备</strong>：卸载驱动的时候需要使用<code>unregister_chrdev</code>函数注销掉前面注册的字符设备。</li>
+</ul>
+<h5 id="（4）设备号详解"><a href="#（4）设备号详解" class="headerlink" title="（4）设备号详解"></a>（4）设备号详解</h5><p>设备号是内核识别设备的关键标识，它是一个32位的无符号整数。</p>
+<ul>
+<li><p><strong>类型定义</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="type">__kernel_dev_t</span>        <span class="type">dev_t</span>;</span><br><span class="line"><span class="keyword">typedef</span> __u32                 <span class="type">__kernel_dev_t</span>;</span><br><span class="line"><span class="keyword">typedef</span> <span class="type">unsigned</span> <span class="type">int</span>          __u32;</span><br></pre></td></tr></table></figure>
+<p>所以<code>dev_t</code>归根结底就是一个32位无符号数。</p>
+</li>
+<li><p><strong>构成</strong>：Linux内核将设备号分为两部分：</p>
+<ul>
+<li><strong>主设备号（高12位）</strong>：用于区分设备的类型。</li>
+<li><strong>次设备号（低20位）</strong>：用于区分同一类型下的不同设备实例。</li>
+</ul>
+</li>
+</ul>
+<h4 id="3-LED灯驱动实例"><a href="#3-LED灯驱动实例" class="headerlink" title="3. LED灯驱动实例"></a>3. LED灯驱动实例</h4><p>此例程展示了在不依赖GPIO子系统时，如何通过地址映射直接操作寄存器来控制LED。</p>
+<h5 id="（1）地址映射详解"><a href="#（1）地址映射详解" class="headerlink" title="（1）地址映射详解"></a>（1）地址映射详解</h5><p>裸机LED灯实验就是直接操作i.MX6ULL的寄存器。Linux驱动开发也可以操作寄存器，但因为Linux使用了MMU（内存管理单元），不能直接对寄存器物理地址进行读写操作。在Linux里面操作的都是虚拟地址，所以需要先得到物理地址对应的虚拟地址。</p>
+<ul>
+<li><strong>映射函数</strong>：<code>ioremap()</code>。第一个参数是物理地址起始大小，第二个参数就是要转换的字节数量。<ul>
+<li><strong>示例</strong>：如要对<code>0X01010101</code>开始10个地址进行转换：<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">va = ioremap(<span class="number">0X01010101</span>, <span class="number">10</span>);</span><br></pre></td></tr></table></figure></li>
+</ul>
+</li>
+<li><strong>解除映射</strong>：卸载驱动的时候需要进行解除映射。<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">iounmap(va);</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h5 id="（2）例程编写流程"><a href="#（2）例程编写流程" class="headerlink" title="（2）例程编写流程"></a>（2）例程编写流程</h5><ol>
+<li><p><strong>地址映射</strong>：对LED相关的时钟、引脚复用、电气属性、GPIO数据&#x2F;方向等寄存器进行<code>ioremap</code>映射。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">IMX6U_CCM_CCGR1 = ioremap(CCM_CCGR1_BASE, <span class="number">4</span>);</span><br><span class="line">SW_MUX_GPIO1_IO03 = ioremap(SW_MUX_GPIO1_IO03_BASE, <span class="number">4</span>);</span><br><span class="line">SW_PAD_GPIO1_IO03 = ioremap(SW_PAD_GPIO1_IO03_BASE, <span class="number">4</span>);</span><br><span class="line">GPIO1_DR = ioremap(GPIO1_DR_BASE, <span class="number">4</span>);</span><br><span class="line">GPIO1_GDIR = ioremap(GPIO1_GDIR_BASE, <span class="number">4</span>);</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>初始化时钟</strong>：使能GPIO1_IO03引脚的时钟。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">val = readl(IMX6U_CCM_CCGR1); <span class="comment">// 读出寄存器中的值</span></span><br><span class="line">val &amp;= ~(<span class="number">3</span> &lt;&lt; <span class="number">26</span>);            <span class="comment">// 清除bit27:26</span></span><br><span class="line">val |= <span class="number">3</span> &lt;&lt; <span class="number">26</span>;               <span class="comment">// bit27:26置一，使能时钟</span></span><br><span class="line">writel(val, IMX6U_CCM_CCGR1); <span class="comment">// 写回寄存器</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>配置GPIO复用和电气属性</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">writel(<span class="number">0x05</span>, SW_MUX_GPIO1_IO03);</span><br><span class="line">writel(<span class="number">0x10b0</span>, SW_PAD_GPIO1_IO03);</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>设置GPIO方向为输出</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">val = readl(GPIO1_GDIR);</span><br><span class="line">val |= <span class="number">1</span> &lt;&lt; <span class="number">3</span>;           <span class="comment">// bit3置一，设置GPIO1_IO03引脚为输出</span></span><br><span class="line">writel(val, GPIO1_GDIR);</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>设置DR寄存器，决定LED亮灭</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">val = readl(GPIO1_DR);</span><br><span class="line">val &amp;= ~(<span class="number">1</span> &lt;&lt; <span class="number">3</span>); <span class="comment">// 清零bit3，打开LED</span></span><br><span class="line">writel(val, GPIO1_DR);</span><br></pre></td></tr></table></figure></li>
+</ol>
+<h5 id="（3）遇到的问题及解决方法"><a href="#（3）遇到的问题及解决方法" class="headerlink" title="（3）遇到的问题及解决方法"></a>（3）遇到的问题及解决方法</h5><p><strong>问题：U-Boot下载系统失败，之前一直正常，突然不能下载。</strong></p>
+<ul>
+<li><strong>排查方向</strong>：首先，要确保整个网段内，开发板的IP地址和Ubuntu的IP地址都是唯一的。可以排查一下是否存在IP地址冲突，比如Ubuntu使用的<code>192.168.1.66</code>是否被其他设备占用了。</li>
+<li><strong>解决方法</strong>：如果有冲突，就换一个未被占用的IP地址。</li>
+</ul>
+<hr>
+<h3 id="四、改善后的字符设备驱动开发"><a href="#四、改善后的字符设备驱动开发" class="headerlink" title="四、改善后的字符设备驱动开发"></a>四、改善后的字符设备驱动开发</h3><h4 id="1-新方法的原理与优势"><a href="#1-新方法的原理与优势" class="headerlink" title="1. 新方法的原理与优势"></a>1. 新方法的原理与优势</h4><ul>
+<li><p><strong>旧版方法的缺点</strong>：使用<code>register_chrdev</code>函数注册字符设备，浪费了很多次设备号，而且需要手动指定主设备号。</p>
+</li>
+<li><p><strong>新版注册流程——申请设备号</strong>：</p>
+<ul>
+<li><strong>动态申请</strong>：使用<code>alloc_chrdev_region</code>函数申请设备号，不能指定特定的某一个设备号。原型如下：<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">alloc_chrdev_region</span><span class="params">(<span class="type">dev_t</span> *dev, <span class="type">unsigned</span> baseminor, <span class="type">unsigned</span> count, <span class="type">const</span> <span class="type">char</span> *name)</span>;</span><br></pre></td></tr></table></figure></li>
+<li><strong>静态指定</strong>：如果指定主设备号，那么就使用<code>register_chrdev_region</code>函数。一般给定主设备号，然后使用<code>MKDEV</code>构建完整的<code>dev_t</code>，一般次设备号选择0。函数原型：<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">register_chrdev_region</span><span class="params">(<span class="type">dev_t</span> from, <span class="type">unsigned</span> count, <span class="type">const</span> <span class="type">char</span> *name)</span>;</span><br></pre></td></tr></table></figure></li>
+<li><strong>释放设备号</strong>：卸载驱动的时候使用<code>unregister_chrdev_region</code>函数释放前面申请的设备号。函数原型：<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">unregister_chrdev_region</span><span class="params">(<span class="type">dev_t</span> from, <span class="type">unsigned</span> count)</span>;</span><br></pre></td></tr></table></figure></li>
+</ul>
+</li>
+<li><p><strong>字符设备注册</strong>：<code>cdev</code>结构体表示字符设备，然后使用<code>cdev_init</code>函数来初始化<code>cdev</code>，原型如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">cdev_init</span><span class="params">(<span class="keyword">struct</span> cdev *cdev, <span class="type">const</span> <span class="keyword">struct</span> file_operations *fops)</span>;</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h4 id="2-自动创建设备节点"><a href="#2-自动创建设备节点" class="headerlink" title="2. 自动创建设备节点"></a>2. 自动创建设备节点</h4><p>之前编写的例程中，需要手动调用<code>mknod</code>创建设备节点，非常不便。</p>
+<ul>
+<li><strong>引入机制</strong>：为简便设备节点创建，2.6版本Linux内核引入了<code>udev</code>机制，替换<code>devfs</code>。<code>udev</code>机制提供热插拔管理，可以在加载驱动的时候自动创建<code>/dev/xx</code>设备文件。</li>
+<li><strong>mdev</strong>：BusyBox提供了<code>udev</code>的简化版本——<code>mdev</code>。</li>
+</ul>
+<h4 id="3-文件私有数据"><a href="#3-文件私有数据" class="headerlink" title="3. 文件私有数据"></a>3. 文件私有数据</h4><p>引入文件私有数据的原因：设备是全局的，文件描述符是私有的。</p>
+<ul>
+<li><p><strong>问题描述</strong>：驱动注册的<code>cdev</code>结构体（或传统的<code>file_operations</code>）在驱动中是全局唯一的，它代表设备本身。但在Linux中，设备可以被多次<code>open</code>：一个进程打开两次<code>/dev/led</code>，得到fd1和fd2；两个进程同时打开<code>/dev/led</code>，各自得到fd。如果没有私有数据，驱动代码中只能用全局变量来记录”谁打开了设备”、”当前的读写位置”、”当前的IO模式”等，这会导致fd1的操作影响fd2的读取结果，这显然是不行的。</p>
+</li>
+<li><p><strong>解决方案</strong>：像下面这个写法，就可以保证每一次<code>open</code>的数据分离开来。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">newchrled_open</span><span class="params">(<span class="keyword">struct</span> inode *inode, <span class="keyword">struct</span> file *filp)</span></span><br><span class="line">&#123;</span><br><span class="line">    filp-&gt;private_data = &amp;newchrled;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">newchrled_release</span><span class="params">(<span class="keyword">struct</span> inode *inode, <span class="keyword">struct</span> file *filp)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">newchrled_dev</span> *<span class="title">dev</span> =</span> (<span class="keyword">struct</span> newchrled_dev*)filp-&gt;private_data;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>随后可以在<code>read</code>和<code>write</code>等函数中访问自己的私有数据，这样可以防止多个程序打开同一个驱动时，发生文件间读写污染。</p>
+</li>
+</ul>
+<hr>
+<h3 id="五、Linux设备树（Device-Tree）"><a href="#五、Linux设备树（Device-Tree）" class="headerlink" title="五、Linux设备树（Device Tree）"></a>五、Linux设备树（Device Tree）</h3><p>设备树（Device Tree，简称DT）是一种描述硬件的数据结构，专门用来解决Linux内核中硬编码板级信息导致的混乱。它以树状数据结构描述硬件资源（CPU、内存、外设等），实现硬件描述与内核代码分离。内核启动时动态读取设备树信息，自动加载适配驱动，大幅提升可移植性与硬件兼容性，已成为Linux描述非可发现硬件的标准方案，支撑多平台通用内核。</p>
+<h4 id="1-DTS、DTC、DTB三者的关系"><a href="#1-DTS、DTC、DTB三者的关系" class="headerlink" title="1. DTS、DTC、DTB三者的关系"></a>1. DTS、DTC、DTB三者的关系</h4><ul>
+<li><strong><code>.dts</code></strong>：相当于<code>.c</code>，就是DTS源码文件。</li>
+<li><strong>DTC工具</strong>：相当于gcc编译器，将<code>.dts</code>编译成<code>.dtb</code>。</li>
+<li><strong><code>.dtb</code></strong>：相当于bin文件，或可执行文件。</li>
+</ul>
+<p>通过<code>make dtbs</code>编译所有的dts文件。如果要编译指定的dtbs，使用<code>make imx6ull-alientek-emmc.dtb</code>。</p>
+<h4 id="2-设备树语法核心要点"><a href="#2-设备树语法核心要点" class="headerlink" title="2. 设备树语法核心要点"></a>2. 设备树语法核心要点</h4><h5 id="（1）根节点"><a href="#（1）根节点" class="headerlink" title="（1）根节点"></a>（1）根节点</h5><p>设备树从<code>/</code>根节点开始描述整个系统的硬件信息，所有节点都在根节点之下。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">/ &#123;</span><br><span class="line">    // 根节点下的内容</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<h5 id="（2）节点完整命名格式"><a href="#（2）节点完整命名格式" class="headerlink" title="（2）节点完整命名格式"></a>（2）节点完整命名格式</h5><p>节点完整命名必须包含两部分：<code>node-name@unit-address</code></p>
+<ul>
+<li><code>node-name</code>：节点名字，描述设备类型。</li>
+<li><code>unit-address</code>：单元地址，通常是外设寄存器的起始地址，也可能是I2C设备地址等，需根据具体节点含义来确定。</li>
+</ul>
+<blockquote>
+<p>示例：<code>interrupt-controller@00a01000</code></p>
+</blockquote>
+<h5 id="（3）标签（Label）"><a href="#（3）标签（Label）" class="headerlink" title="（3）标签（Label）"></a>（3）标签（Label）</h5><p>标签写在节点名字前面，用冒号分隔，用于在其他地方方便引用该节点：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">label: node-name@unit-address</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>示例：<code>intc: interrupt-controller@00a01000</code></p>
+<ul>
+<li>标签：<code>intc</code></li>
+<li>完整名字：<code>interrupt-controller@00a01000</code></li>
+</ul>
+</blockquote>
+<h5 id="（4）节点追加-修改"><a href="#（4）节点追加-修改" class="headerlink" title="（4）节点追加&#x2F;修改"></a>（4）节点追加&#x2F;修改</h5><p>在根节点之外，可以使用<code>&amp;label</code>语法对已有节点进行属性追加或覆盖，这是一种引用方式：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&amp;cpu0 &#123;</span><br><span class="line">    // 追加或修改 cpu0 的属性</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>这种写法通常用来在不同<code>.dtsi</code>或<code>.dts</code>文件中对节点进行补充配置。</p>
+<h4 id="3-设备树在系统中的体现"><a href="#3-设备树在系统中的体现" class="headerlink" title="3. 设备树在系统中的体现"></a>3. 设备树在系统中的体现</h4><h5 id="（1）查看位置"><a href="#（1）查看位置" class="headerlink" title="（1）查看位置"></a>（1）查看位置</h5><p>系统启动后，设备树的节点信息以文件形式呈现在：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/proc/device-tree/</span><br></pre></td></tr></table></figure>
+
+<h5 id="（2）作用原理"><a href="#（2）作用原理" class="headerlink" title="（2）作用原理"></a>（2）作用原理</h5><ul>
+<li>内核在启动时会解析设备树（DTB）。</li>
+<li>解析后将整个设备树结构导出到<code>/proc/device-tree/</code>目录。</li>
+<li>每个节点对应一个目录，属性对应文件，可以通过<code>cat</code>等命令查看属性值。</li>
+</ul>
+<h5 id="（3）使用示例"><a href="#（3）使用示例" class="headerlink" title="（3）使用示例"></a>（3）使用示例</h5><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">ls</span> /proc/device-tree/          <span class="comment"># 查看根节点下的子节点</span></span><br><span class="line"><span class="built_in">cat</span> /proc/device-tree/model    <span class="comment"># 查看设备型号属性</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="4-特殊节点"><a href="#4-特殊节点" class="headerlink" title="4. 特殊节点"></a>4. 特殊节点</h4><h5 id="（1）aliases-节点"><a href="#（1）aliases-节点" class="headerlink" title="（1）aliases 节点"></a>（1）aliases 节点</h5><p>用于定义设备节点的别名，方便内核或其他节点引用。</p>
+<h5 id="（2）chosen-节点"><a href="#（2）chosen-节点" class="headerlink" title="（2）chosen 节点"></a>（2）chosen 节点</h5><p><strong>核心作用</strong>：将U-Boot的<code>bootargs</code>环境变量传递给Linux内核，作为内核命令行参数（cmdline）。</p>
+<p><strong>传递流程</strong>：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">U-Boot bootargs 环境变量</span><br><span class="line">        ↓</span><br><span class="line">写入 chosen 节点的 bootargs 属性</span><br><span class="line">        ↓</span><br><span class="line">内核启动时解析 chosen 节点</span><br><span class="line">        ↓</span><br><span class="line">作为 Kernel command line 使用</span><br></pre></td></tr></table></figure>
+
+<p><strong>实际数据对比</strong>：</p>
+<ul>
+<li>U-Boot端：<code>bootargs=console=ttymxc0,115200 rw root=/dev/nfs ...</code></li>
+<li>Kernel端：<code>Kernel command line: console=ttymxc0,115200 rw root=/dev/nfs ...</code></li>
+</ul>
+<p>两者完全一致，证明<code>bootargs</code>通过chosen节点成功传递。</p>
+<p><strong>U-Boot启动命令</strong>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">bootz 80800000 - 83000000</span><br></pre></td></tr></table></figure>
+<ul>
+<li><code>80800000</code>：内核镜像加载地址。</li>
+<li><code>83000000</code>：DTB设备树加载地址。</li>
+<li>U-Boot在启动前会操作DTB，在<code>fdt_chosen</code>函数中会查找chosen节点，并且在里面添加<code>bootargs</code>属性，属性值为<code>bootargs</code>变量值。</li>
+</ul>
+<h4 id="5-Linux内核的OF操作函数"><a href="#5-Linux内核的OF操作函数" class="headerlink" title="5. Linux内核的OF操作函数"></a>5. Linux内核的OF操作函数</h4><h5 id="（1）基本概念"><a href="#（1）基本概念" class="headerlink" title="（1）基本概念"></a>（1）基本概念</h5><ul>
+<li><strong>OF</strong>：Open Firmware，设备树在Linux内核中的编程接口。</li>
+<li>驱动通过OF函数族获取设备树中节点的属性内容。</li>
+<li>相关头文件：<code>#include &lt;linux/of.h&gt;</code></li>
+</ul>
+<h5 id="（2）查找节点"><a href="#（2）查找节点" class="headerlink" title="（2）查找节点"></a>（2）查找节点</h5><ul>
+<li><p><strong>按路径查找</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> device_node *<span class="title function_">of_find_node_by_path</span><span class="params">(<span class="type">const</span> <span class="type">char</span> *path)</span>;</span><br></pre></td></tr></table></figure>
+<p>示例：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">device_node</span> *<span class="title">np</span> =</span> of_find_node_by_path(<span class="string">&quot;/soc/i2c@021a0000&quot;</span>);</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>按类型查找</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> device_node *<span class="title function_">of_find_node_by_type</span><span class="params">(<span class="keyword">struct</span> device_node *from, <span class="type">const</span> <span class="type">char</span> *type)</span>;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>按名称查找</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> device_node *<span class="title function_">of_find_node_by_name</span><span class="params">(<span class="keyword">struct</span> device_node *from, <span class="type">const</span> <span class="type">char</span> *name)</span>;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>按compatible属性查找（最常用）</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> device_node *<span class="title function_">of_find_compatible_node</span><span class="params">(<span class="keyword">struct</span> device_node *from,</span></span><br><span class="line"><span class="params">                                             <span class="type">const</span> <span class="type">char</span> *type,</span></span><br><span class="line"><span class="params">                                             <span class="type">const</span> <span class="type">char</span> *compatible)</span>;</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h5 id="（3）获取属性值"><a href="#（3）获取属性值" class="headerlink" title="（3）获取属性值"></a>（3）获取属性值</h5><ul>
+<li><p><strong>获取整数属性</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">of_property_read_u32</span><span class="params">(<span class="type">const</span> <span class="keyword">struct</span> device_node *np, <span class="type">const</span> <span class="type">char</span> *propname, u32 *out_value)</span>;</span><br><span class="line"><span class="type">int</span> <span class="title function_">of_property_read_u32_array</span><span class="params">(<span class="type">const</span> <span class="keyword">struct</span> device_node *np, <span class="type">const</span> <span class="type">char</span> *propname,</span></span><br><span class="line"><span class="params">                                u32 *out_values, <span class="type">size_t</span> sz)</span>;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>获取字符串属性</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">of_property_read_string</span><span class="params">(<span class="type">const</span> <span class="keyword">struct</span> device_node *np, <span class="type">const</span> <span class="type">char</span> *propname,</span></span><br><span class="line"><span class="params">                             <span class="type">const</span> <span class="type">char</span> **out_string)</span>;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>获取MAC地址</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">const</span> <span class="type">void</span> *<span class="title function_">of_get_mac_address</span><span class="params">(<span class="type">const</span> <span class="keyword">struct</span> device_node *np)</span>;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>获取GPIO</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">of_get_named_gpio</span><span class="params">(<span class="keyword">struct</span> device_node *np, <span class="type">const</span> <span class="type">char</span> *propname, <span class="type">int</span> index)</span>;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>获取IRQ</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">unsigned</span> <span class="type">int</span> <span class="title function_">irq_of_parse_and_map</span><span class="params">(<span class="keyword">struct</span> device_node *dev, <span class="type">int</span> index)</span>;</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h5 id="（4）节点遍历"><a href="#（4）节点遍历" class="headerlink" title="（4）节点遍历"></a>（4）节点遍历</h5><ul>
+<li><p><strong>遍历子节点</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> device_node *<span class="title function_">for_each_child_of_node</span><span class="params">(<span class="keyword">struct</span> device_node *parent,</span></span><br><span class="line"><span class="params">                                            <span class="keyword">struct</span> device_node *child)</span>;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p><strong>遍历compatible匹配的节点</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> device_node *<span class="title function_">for_each_compatible_node</span><span class="params">(<span class="keyword">struct</span> device_node *from,</span></span><br><span class="line"><span class="params">                                              <span class="type">const</span> <span class="type">char</span> *type,</span></span><br><span class="line"><span class="params">                                              <span class="type">const</span> <span class="type">char</span> *compatible)</span>;</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h5 id="（5）使用示例"><a href="#（5）使用示例" class="headerlink" title="（5）使用示例"></a>（5）使用示例</h5><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">device_node</span> *<span class="title">np</span>;</span></span><br><span class="line"><span class="type">const</span> <span class="type">char</span> *status;</span><br><span class="line">u32 reg_value;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 1. 查找节点</span></span><br><span class="line">np = of_find_compatible_node(<span class="literal">NULL</span>, <span class="literal">NULL</span>, <span class="string">&quot;vendor,device&quot;</span>);</span><br><span class="line"><span class="keyword">if</span> (!np) &#123;</span><br><span class="line">    pr_err(<span class="string">&quot;Node not found\n&quot;</span>);</span><br><span class="line">    <span class="keyword">return</span> -ENODEV;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 2. 读取属性</span></span><br><span class="line">of_property_read_string(np, <span class="string">&quot;status&quot;</span>, &amp;status);</span><br><span class="line">of_property_read_u32(np, <span class="string">&quot;reg&quot;</span>, &amp;reg_value);</span><br><span class="line"></span><br><span class="line">pr_info(<span class="string">&quot;status: %s, reg: 0x%x\n&quot;</span>, status, reg_value);</span><br></pre></td></tr></table></figure>
+
+<h5 id="（6）关键数据结构"><a href="#（6）关键数据结构" class="headerlink" title="（6）关键数据结构"></a>（6）关键数据结构</h5><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">device_node</span> &#123;</span></span><br><span class="line">    <span class="type">const</span> <span class="type">char</span> *name;      <span class="comment">// 节点名</span></span><br><span class="line">    <span class="type">const</span> <span class="type">char</span> *full_name; <span class="comment">// 完整路径名</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">property</span> *<span class="title">properties</span>;</span> <span class="comment">// 属性链表</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">device_node</span> *<span class="title">parent</span>;</span>  <span class="comment">// 父节点</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">device_node</span> *<span class="title">child</span>;</span>   <span class="comment">// 子节点</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">device_node</span> *<span class="title">sibling</span>;</span> <span class="comment">// 兄弟节点</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<h5 id="（7）核心思路"><a href="#（7）核心思路" class="headerlink" title="（7）核心思路"></a>（7）核心思路</h5><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">驱动启动 → 查找设备树节点 → 读取节点属性 → 使用属性值初始化硬件</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h3 id="六、Pinctrl与GPIO子系统"><a href="#六、Pinctrl与GPIO子系统" class="headerlink" title="六、Pinctrl与GPIO子系统"></a>六、Pinctrl与GPIO子系统</h3><ul>
+<li><strong>pinctrl子系统</strong>：借助pinctrl来设置一个PIN的复用和电气属性。</li>
+<li><strong>GPIO子系统</strong>：使用gpio子系统来使用GPIO。</li>
+</ul>
+<h4 id="1-Pinctrl子系统"><a href="#1-Pinctrl子系统" class="headerlink" title="1. Pinctrl子系统"></a>1. Pinctrl子系统</h4><p>Pinctrl是Linux内核用来管理芯片引脚（Pin）复用和电气属性的基础设施。在现代复杂的SoC上，一个物理引脚往往有多种功能，pinctrl就是专门解决这个问题的。</p>
+<h5 id="（1）引入pinctrl的原因"><a href="#（1）引入pinctrl的原因" class="headerlink" title="（1）引入pinctrl的原因"></a>（1）引入pinctrl的原因</h5><p>解决引脚冲突：如果驱动程序各自为政，在初始化时都去直接操作寄存器，想把同一个引脚配置成不同功能，就会发生冲突，导致系统工作异常。pinctrl子系统的出现，就是为了提供一个统一的管理框架，从根本上避免这种混乱。</p>
+<h5 id="（2）内核3大核心角色"><a href="#（2）内核3大核心角色" class="headerlink" title="（2）内核3大核心角色"></a>（2）内核3大核心角色</h5><p>pinctrl的框架由三大逻辑块构成：</p>
+<ol>
+<li><p><strong>引脚控制器驱动（Pin Controller Driver）</strong>：这是具体干活的部分，由芯片厂商编写，直接读写SoC的引脚配置寄存器。它向上提供统一的硬件抽象，让其他部分无需关心底层寄存器细节。在<code>drivers/pinctrl/</code>目录下，能看到<code>pinctrl-stm32.c</code>、<code>pinctrl-bcm2835.c</code>等各类平台的具体实现。</p>
+</li>
+<li><p><strong>核心框架（Pinctrl Core）</strong>：这是登记和管理中心，是内核的标准代码。它维护所有引脚、引脚组和功能配置的数据库，负责处理上层来的请求，协调冲突。</p>
+</li>
+<li><p><strong>消费者（Consumers）</strong>：这是提需求的用户，通常是具体的外设驱动（如I2C、SPI、UART）。它们不直接碰寄存器，而是通过标准接口向核心框架请求一个”引脚配置”。</p>
+</li>
+</ol>
+<h5 id="（3）如何添加一个PIN的信息"><a href="#（3）如何添加一个PIN的信息" class="headerlink" title="（3）如何添加一个PIN的信息"></a>（3）如何添加一个PIN的信息</h5><figure class="highlight dts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="symbol">pinctrl_hog_1:</span> <span class="title class_">hoggrp-1</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">fsl,pins</span> <span class="operator">=</span> <span class="params">&lt;</span></span><br><span class="line"><span class="params">        MX6UL_PAD_UART1_RTS_B__GPIO1_IO19  <span class="number">0x17059</span> /* SD1 CD */</span></span><br><span class="line"><span class="params">    &gt;</span><span class="punctuation">;</span></span><br><span class="line"><span class="punctuation">&#125;;</span></span><br></pre></td></tr></table></figure>
+
+<p>在<code>imx6ul-pinfunc.h</code>中找到：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">MX6UL_PAD_UART1_RTS_B__GPIO1_IO19    0x0090 0x031C 0x0000 0x5 0x0</span><br></pre></td></tr></table></figure>
+
+<p>这个宏包含5个参数：<code>&lt;mux_reg  conf_reg  input_reg  mux_mode  input_val&gt;</code></p>
+<p>即：<code>0x0090    0x031C    0x0000      0x5       0x0</code></p>
+<ol>
+<li><strong>mux_reg</strong>：<code>0x0090</code>。IOMUXC父节点首地址为<code>0x020e0000</code>，因此UART1_RTS_B这个PIN的mux寄存器地址就是：<code>0x020e0000 + 0x0090 = 0x020e 0090</code>。</li>
+<li><strong>conf_reg</strong>：<code>0x031C</code>。<code>0x020e0000 + 0x031C = 0x020e 031C</code>，这个寄存器就是UART1_RTS_B的电气属性配置寄存器。</li>
+<li><strong>input_reg</strong>：值为<code>0</code>，表示UART1_RTS_B这个PIN没有input功能。</li>
+<li><strong>mux_mode</strong>：<code>5</code>表示复用为GPIO1_IO19，将其写入<code>0x020e 0090</code>。</li>
+<li><strong>input_val</strong>：就是写入input_reg寄存器的值。</li>
+<li><strong><code>0x17059</code></strong>：写入电气属性配置寄存器的值。</li>
+</ol>
+<h4 id="2-GPIO子系统"><a href="#2-GPIO子系统" class="headerlink" title="2. GPIO子系统"></a>2. GPIO子系统</h4><h5 id="（1）GPIO在设备树中的表示"><a href="#（1）GPIO在设备树中的表示" class="headerlink" title="（1）GPIO在设备树中的表示"></a>（1）GPIO在设备树中的表示</h5><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&amp;gpio1 &#123;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>![GPIO设备树节点示意图][Alternative Text]</p>
+<p>这其中定义了一个<code>cd-gpios</code>属性，在这个属性中设置了GPIO1_19的有效电平为低电平。</p>
+<h5 id="（2）驱动中对GPIO的操作函数"><a href="#（2）驱动中对GPIO的操作函数" class="headerlink" title="（2）驱动中对GPIO的操作函数"></a>（2）驱动中对GPIO的操作函数</h5><ol>
+<li>首先，获取到GPIO所处的设备节点，比如使用<code>of_find_node_by_path</code>。</li>
+<li>获取GPIO编号，使用<code>of_get_named_gpio</code>函数，返回值就是GPIO编号。</li>
+<li>请求此编号的GPIO，使用<code>gpio_request</code>函数。</li>
+<li>设置GPIO为输入或输出，使用<code>gpio_direction_input</code>或<code>gpio_direction_output</code>。</li>
+<li>如果是输入，通过<code>gpio_get_value</code>函数读取GPIO值；如果是输出，通过<code>gpio_set_value</code>函数设置GPIO值。</li>
+</ol>
+<h5 id="（3）驱动编写中遇到的问题"><a href="#（3）驱动编写中遇到的问题" class="headerlink" title="（3）驱动编写中遇到的问题"></a>（3）驱动编写中遇到的问题</h5><p><strong>申请GPIO失败</strong></p>
+<ul>
+<li><strong>原因</strong>：申请的那个GPIO被占用了。</li>
+<li><strong>解决方法</strong>：如果要使用，需要先解除占用或者重新申请其他GPIO。</li>
+</ul>
+<h4 id="3-使用Pinctrl和GPIO子系统实现驱动编写总结"><a href="#3-使用Pinctrl和GPIO子系统实现驱动编写总结" class="headerlink" title="3. 使用Pinctrl和GPIO子系统实现驱动编写总结"></a>3. 使用Pinctrl和GPIO子系统实现驱动编写总结</h4><ol>
+<li>添加pinctrl信息。</li>
+<li>检查当前设备树中要使用的IO有没有被其他设备使用，如果有的话要处理。</li>
+<li>添加设备节点，在设备节点中创建一个属性，此属性描述所使用的GPIO。</li>
+<li>编写驱动，获取对应的GPIO编号，并申请IO，成功以后即可使用此IO。</li>
+</ol>
+<hr>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Linux%E7%B3%BB%E7%BB%9F%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/" rel="tag"># Linux系统驱动开发</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/06/20/%E8%A3%B8%E6%9C%BA%E9%A9%B1%E5%8A%A8%E4%B9%8BI2C/" rel="prev" title="裸机驱动开发之I2C">
+      <i class="fa fa-chevron-left"></i> 裸机驱动开发之I2C
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2026/06/27/Cortex-A%E4%B8%AD%E6%96%AD/" rel="next" title="裸机驱动开发之Cortex-A 中断">
+      裸机驱动开发之Cortex-A 中断 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%80%E3%80%81Linux%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91%E6%A0%B8%E5%BF%83%E6%80%9D%E6%83%B3"><span class="nav-number">1.</span> <span class="nav-text">一、Linux驱动开发核心思想</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BA%8C%E3%80%81Linux%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91%E5%88%86%E7%B1%BB"><span class="nav-number">2.</span> <span class="nav-text">二、Linux驱动开发分类</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E5%AD%97%E7%AC%A6%E8%AE%BE%E5%A4%87%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91%E5%9F%BA%E7%A1%80"><span class="nav-number">3.</span> <span class="nav-text">三、字符设备驱动开发基础</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#1-%E5%BA%94%E7%94%A8%E7%A8%8B%E5%BA%8F%E4%B8%8E%E9%A9%B1%E5%8A%A8%E7%9A%84%E4%BA%A4%E4%BA%92%E5%8E%9F%E7%90%86"><span class="nav-number">3.1.</span> <span class="nav-text">1. 应用程序与驱动的交互原理</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-%E5%AD%97%E7%AC%A6%E8%AE%BE%E5%A4%87%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91%E6%B5%81%E7%A8%8B"><span class="nav-number">3.2.</span> <span class="nav-text">2. 字符设备驱动开发流程</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%881%EF%BC%89%E5%AD%97%E7%AC%A6%E8%AE%BE%E5%A4%87%E9%A9%B1%E5%8A%A8%E6%A1%86%E6%9E%B6"><span class="nav-number">3.2.1.</span> <span class="nav-text">（1）字符设备驱动框架</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%882%EF%BC%89%E9%A9%B1%E5%8A%A8%E6%A8%A1%E5%9D%97%E7%9A%84%E5%8A%A0%E8%BD%BD%E4%B8%8E%E5%8D%B8%E8%BD%BD"><span class="nav-number">3.2.2.</span> <span class="nav-text">（2）驱动模块的加载与卸载</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%883%EF%BC%89%E5%AD%97%E7%AC%A6%E8%AE%BE%E5%A4%87%E7%9A%84%E6%B3%A8%E5%86%8C%E4%B8%8E%E6%B3%A8%E9%94%80"><span class="nav-number">3.2.3.</span> <span class="nav-text">（3）字符设备的注册与注销</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%884%EF%BC%89%E8%AE%BE%E5%A4%87%E5%8F%B7%E8%AF%A6%E8%A7%A3"><span class="nav-number">3.2.4.</span> <span class="nav-text">（4）设备号详解</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-LED%E7%81%AF%E9%A9%B1%E5%8A%A8%E5%AE%9E%E4%BE%8B"><span class="nav-number">3.3.</span> <span class="nav-text">3. LED灯驱动实例</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%881%EF%BC%89%E5%9C%B0%E5%9D%80%E6%98%A0%E5%B0%84%E8%AF%A6%E8%A7%A3"><span class="nav-number">3.3.1.</span> <span class="nav-text">（1）地址映射详解</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%882%EF%BC%89%E4%BE%8B%E7%A8%8B%E7%BC%96%E5%86%99%E6%B5%81%E7%A8%8B"><span class="nav-number">3.3.2.</span> <span class="nav-text">（2）例程编写流程</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%883%EF%BC%89%E9%81%87%E5%88%B0%E7%9A%84%E9%97%AE%E9%A2%98%E5%8F%8A%E8%A7%A3%E5%86%B3%E6%96%B9%E6%B3%95"><span class="nav-number">3.3.3.</span> <span class="nav-text">（3）遇到的问题及解决方法</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9B%9B%E3%80%81%E6%94%B9%E5%96%84%E5%90%8E%E7%9A%84%E5%AD%97%E7%AC%A6%E8%AE%BE%E5%A4%87%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91"><span class="nav-number">4.</span> <span class="nav-text">四、改善后的字符设备驱动开发</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#1-%E6%96%B0%E6%96%B9%E6%B3%95%E7%9A%84%E5%8E%9F%E7%90%86%E4%B8%8E%E4%BC%98%E5%8A%BF"><span class="nav-number">4.1.</span> <span class="nav-text">1. 新方法的原理与优势</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-%E8%87%AA%E5%8A%A8%E5%88%9B%E5%BB%BA%E8%AE%BE%E5%A4%87%E8%8A%82%E7%82%B9"><span class="nav-number">4.2.</span> <span class="nav-text">2. 自动创建设备节点</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-%E6%96%87%E4%BB%B6%E7%A7%81%E6%9C%89%E6%95%B0%E6%8D%AE"><span class="nav-number">4.3.</span> <span class="nav-text">3. 文件私有数据</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BA%94%E3%80%81Linux%E8%AE%BE%E5%A4%87%E6%A0%91%EF%BC%88Device-Tree%EF%BC%89"><span class="nav-number">5.</span> <span class="nav-text">五、Linux设备树（Device Tree）</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#1-DTS%E3%80%81DTC%E3%80%81DTB%E4%B8%89%E8%80%85%E7%9A%84%E5%85%B3%E7%B3%BB"><span class="nav-number">5.1.</span> <span class="nav-text">1. DTS、DTC、DTB三者的关系</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-%E8%AE%BE%E5%A4%87%E6%A0%91%E8%AF%AD%E6%B3%95%E6%A0%B8%E5%BF%83%E8%A6%81%E7%82%B9"><span class="nav-number">5.2.</span> <span class="nav-text">2. 设备树语法核心要点</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%881%EF%BC%89%E6%A0%B9%E8%8A%82%E7%82%B9"><span class="nav-number">5.2.1.</span> <span class="nav-text">（1）根节点</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%882%EF%BC%89%E8%8A%82%E7%82%B9%E5%AE%8C%E6%95%B4%E5%91%BD%E5%90%8D%E6%A0%BC%E5%BC%8F"><span class="nav-number">5.2.2.</span> <span class="nav-text">（2）节点完整命名格式</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%883%EF%BC%89%E6%A0%87%E7%AD%BE%EF%BC%88Label%EF%BC%89"><span class="nav-number">5.2.3.</span> <span class="nav-text">（3）标签（Label）</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%884%EF%BC%89%E8%8A%82%E7%82%B9%E8%BF%BD%E5%8A%A0-%E4%BF%AE%E6%94%B9"><span class="nav-number">5.2.4.</span> <span class="nav-text">（4）节点追加&#x2F;修改</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-%E8%AE%BE%E5%A4%87%E6%A0%91%E5%9C%A8%E7%B3%BB%E7%BB%9F%E4%B8%AD%E7%9A%84%E4%BD%93%E7%8E%B0"><span class="nav-number">5.3.</span> <span class="nav-text">3. 设备树在系统中的体现</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%881%EF%BC%89%E6%9F%A5%E7%9C%8B%E4%BD%8D%E7%BD%AE"><span class="nav-number">5.3.1.</span> <span class="nav-text">（1）查看位置</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%882%EF%BC%89%E4%BD%9C%E7%94%A8%E5%8E%9F%E7%90%86"><span class="nav-number">5.3.2.</span> <span class="nav-text">（2）作用原理</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%883%EF%BC%89%E4%BD%BF%E7%94%A8%E7%A4%BA%E4%BE%8B"><span class="nav-number">5.3.3.</span> <span class="nav-text">（3）使用示例</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#4-%E7%89%B9%E6%AE%8A%E8%8A%82%E7%82%B9"><span class="nav-number">5.4.</span> <span class="nav-text">4. 特殊节点</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%881%EF%BC%89aliases-%E8%8A%82%E7%82%B9"><span class="nav-number">5.4.1.</span> <span class="nav-text">（1）aliases 节点</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%882%EF%BC%89chosen-%E8%8A%82%E7%82%B9"><span class="nav-number">5.4.2.</span> <span class="nav-text">（2）chosen 节点</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#5-Linux%E5%86%85%E6%A0%B8%E7%9A%84OF%E6%93%8D%E4%BD%9C%E5%87%BD%E6%95%B0"><span class="nav-number">5.5.</span> <span class="nav-text">5. Linux内核的OF操作函数</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%881%EF%BC%89%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5"><span class="nav-number">5.5.1.</span> <span class="nav-text">（1）基本概念</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%882%EF%BC%89%E6%9F%A5%E6%89%BE%E8%8A%82%E7%82%B9"><span class="nav-number">5.5.2.</span> <span class="nav-text">（2）查找节点</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%883%EF%BC%89%E8%8E%B7%E5%8F%96%E5%B1%9E%E6%80%A7%E5%80%BC"><span class="nav-number">5.5.3.</span> <span class="nav-text">（3）获取属性值</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%884%EF%BC%89%E8%8A%82%E7%82%B9%E9%81%8D%E5%8E%86"><span class="nav-number">5.5.4.</span> <span class="nav-text">（4）节点遍历</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%885%EF%BC%89%E4%BD%BF%E7%94%A8%E7%A4%BA%E4%BE%8B"><span class="nav-number">5.5.5.</span> <span class="nav-text">（5）使用示例</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%886%EF%BC%89%E5%85%B3%E9%94%AE%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84"><span class="nav-number">5.5.6.</span> <span class="nav-text">（6）关键数据结构</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%887%EF%BC%89%E6%A0%B8%E5%BF%83%E6%80%9D%E8%B7%AF"><span class="nav-number">5.5.7.</span> <span class="nav-text">（7）核心思路</span></a></li></ol></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%AD%E3%80%81Pinctrl%E4%B8%8EGPIO%E5%AD%90%E7%B3%BB%E7%BB%9F"><span class="nav-number">6.</span> <span class="nav-text">六、Pinctrl与GPIO子系统</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#1-Pinctrl%E5%AD%90%E7%B3%BB%E7%BB%9F"><span class="nav-number">6.1.</span> <span class="nav-text">1. Pinctrl子系统</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%881%EF%BC%89%E5%BC%95%E5%85%A5pinctrl%E7%9A%84%E5%8E%9F%E5%9B%A0"><span class="nav-number">6.1.1.</span> <span class="nav-text">（1）引入pinctrl的原因</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%882%EF%BC%89%E5%86%85%E6%A0%B83%E5%A4%A7%E6%A0%B8%E5%BF%83%E8%A7%92%E8%89%B2"><span class="nav-number">6.1.2.</span> <span class="nav-text">（2）内核3大核心角色</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%883%EF%BC%89%E5%A6%82%E4%BD%95%E6%B7%BB%E5%8A%A0%E4%B8%80%E4%B8%AAPIN%E7%9A%84%E4%BF%A1%E6%81%AF"><span class="nav-number">6.1.3.</span> <span class="nav-text">（3）如何添加一个PIN的信息</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-GPIO%E5%AD%90%E7%B3%BB%E7%BB%9F"><span class="nav-number">6.2.</span> <span class="nav-text">2. GPIO子系统</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%881%EF%BC%89GPIO%E5%9C%A8%E8%AE%BE%E5%A4%87%E6%A0%91%E4%B8%AD%E7%9A%84%E8%A1%A8%E7%A4%BA"><span class="nav-number">6.2.1.</span> <span class="nav-text">（1）GPIO在设备树中的表示</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%882%EF%BC%89%E9%A9%B1%E5%8A%A8%E4%B8%AD%E5%AF%B9GPIO%E7%9A%84%E6%93%8D%E4%BD%9C%E5%87%BD%E6%95%B0"><span class="nav-number">6.2.2.</span> <span class="nav-text">（2）驱动中对GPIO的操作函数</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#%EF%BC%883%EF%BC%89%E9%A9%B1%E5%8A%A8%E7%BC%96%E5%86%99%E4%B8%AD%E9%81%87%E5%88%B0%E7%9A%84%E9%97%AE%E9%A2%98"><span class="nav-number">6.2.3.</span> <span class="nav-text">（3）驱动编写中遇到的问题</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3-%E4%BD%BF%E7%94%A8Pinctrl%E5%92%8CGPIO%E5%AD%90%E7%B3%BB%E7%BB%9F%E5%AE%9E%E7%8E%B0%E9%A9%B1%E5%8A%A8%E7%BC%96%E5%86%99%E6%80%BB%E7%BB%93"><span class="nav-number">6.3.</span> <span class="nav-text">3. 使用Pinctrl和GPIO子系统实现驱动编写总结</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Huiting_Yang"
+      src="/images/troye.jpg">
+  <p class="site-author-name" itemprop="name">Huiting_Yang</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">20</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">13</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Huiting_Yang</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/pangu@4/dist/browser/pangu.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+<script src="/js/bookmark.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
