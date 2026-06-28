@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 8.1.2">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"troyeeee673.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":"default"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":true,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":true,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
+  </script>
+
+  <meta name="description" content="# 一、并发与竞争简介 ## 1.1 什么是并发与竞争？ - *并发（Concurrency）*：多个执行单元（线程、中断、多核CPU）同时访问共享资源。 - *竞争（Race Condition）*：由于并发访问导致共享资源的状态出现非预期结果。 - *并发来源*：  - *多线程&#x2F;多进程*：多个任务抢占CPU，访问共享数据。  - *中断*：硬件中断可随时打断当前任务，处理程序可能访">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Linux驱动之并发与竞争">
+<meta property="og:url" content="https://troyeeee673.github.io/2026/06/28/Linux%E9%A9%B1%E5%8A%A8%E4%B9%8B%E5%B9%B6%E5%8F%91%E4%B8%8E%E7%AB%9E%E4%BA%89/index.html">
+<meta property="og:site_name" content="Linux系统编程">
+<meta property="og:description" content="# 一、并发与竞争简介 ## 1.1 什么是并发与竞争？ - *并发（Concurrency）*：多个执行单元（线程、中断、多核CPU）同时访问共享资源。 - *竞争（Race Condition）*：由于并发访问导致共享资源的状态出现非预期结果。 - *并发来源*：  - *多线程&#x2F;多进程*：多个任务抢占CPU，访问共享数据。  - *中断*：硬件中断可随时打断当前任务，处理程序可能访">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-06-28T14:27:45.000Z">
+<meta property="article:modified_time" content="2026-06-28T14:29:17.329Z">
+<meta property="article:author" content="Huiting_Yang">
+<meta property="article:tag" content="Linux系统驱动开发">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://troyeeee673.github.io/2026/06/28/Linux%E9%A9%B1%E5%8A%A8%E4%B9%8B%E5%B9%B6%E5%8F%91%E4%B8%8E%E7%AB%9E%E4%BA%89/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Linux驱动之并发与竞争 | Linux系统编程</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<link rel="alternate" href="/atom.xml" title="Linux系统编程" type="application/atom+xml">
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Linux系统编程</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+        <i class="fa fa-search fa-fw fa-lg"></i>
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fth fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="archive fa-fw"></i>归档</a>
+
+  </li>
+      <li class="menu-item menu-item-search">
+        <a role="button" class="popup-trigger"><i class="fa fa-search fa-fw"></i>搜索
+        </a>
+      </li>
+  </ul>
+</nav>
+
+
+
+  <div class="search-pop-overlay">
+    <div class="popup search-popup">
+        <div class="search-header">
+  <span class="search-icon">
+    <i class="fa fa-search"></i>
+  </span>
+  <div class="search-input-container">
+    <input autocomplete="off" autocapitalize="off"
+           placeholder="搜索..." spellcheck="false"
+           type="search" class="search-input">
+  </div>
+  <span class="popup-btn-close">
+    <i class="fa fa-times-circle"></i>
+  </span>
+</div>
+<div id="search-result">
+  <div id="no-result">
+    <i class="fa fa-spinner fa-pulse fa-5x fa-fw"></i>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
+
+  <a href="https://github.com/yourname" class="github-corner" title="Follow me on GitHub" aria-label="Follow me on GitHub" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://troyeeee673.github.io/2026/06/28/Linux%E9%A9%B1%E5%8A%A8%E4%B9%8B%E5%B9%B6%E5%8F%91%E4%B8%8E%E7%AB%9E%E4%BA%89/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/troye.jpg">
+      <meta itemprop="name" content="Huiting_Yang">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Linux系统编程">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Linux驱动之并发与竞争
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-06-28 22:27:45 / 修改时间：22:29:17" itemprop="dateCreated datePublished" datetime="2026-06-28T22:27:45+08:00">2026-06-28</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux%E7%B3%BB%E7%BB%9F%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/" itemprop="url" rel="index"><span itemprop="name">Linux系统驱动开发</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p><strong># 一、并发与竞争简介</strong></p>
+<p><strong>## 1.1 什么是并发与竞争？</strong></p>
+<p>- <em><strong>*并发（Concurrency）*</strong></em>：多个执行单元（线程、中断、多核CPU）同时访问共享资源。</p>
+<p>- <em><strong>*竞争（Race Condition）*</strong></em>：由于并发访问导致共享资源的状态出现非预期结果。</p>
+<p>- <em><strong>*并发来源*</strong></em>：</p>
+<p> - <em><strong>*多线程&#x2F;多进程*</strong></em>：多个任务抢占CPU，访问共享数据。</p>
+<p> - <em><strong>*中断*</strong></em>：硬件中断可随时打断当前任务，处理程序可能访问相同数据。</p>
+<p> - <em><strong>*多核（SMP）*</strong></em>：多个CPU核心真正并行执行，同时操作内存。</p>
+<p> - <em><strong>*内核抢占*</strong></em>：内核态任务可被更高优先级任务抢占。</p>
+<p><strong>## 1.2 保护的是什么？</strong></p>
+<p>- <em><strong>*保护对象：共享数据（临界资源）*</strong></em>。</p>
+<p>- <em><strong>*临界区（Critical Section）*</strong></em>：访问共享数据的代码段。必须保证这段代码在同一时刻只被一个执行单元访问。</p>
+<p>-–</p>
+<p><strong># 二、并发与竞争解决方法</strong></p>
+<p><strong>## 2.1 原子操作</strong></p>
+<p><em><strong>*适用场景*</strong></em>：保护单一的、简单的整数或位运算。开销最小。</p>
+<p><strong>### 2.1.1 原子变量操作</strong></p>
+<p>Linux内核提供 <code>atomic_t</code> (32位) 和 <code>atomic64_t</code> (64位) 结构体。</p>
+<p>`&#96;&#96;c</p>
+<p>atomic_t my_atomic &#x3D; ATOMIC_INIT(0); &#x2F;&#x2F; 定义并初始化</p>
+<p>`&#96;&#96;</p>
+<p>| 函数 | 描述 | 备注 |</p>
+<p>| :— | :— | :— |</p>
+<p>| <code>ATOMIC_INIT(int i)</code> | 编译时初始化原子变量。 | |</p>
+<p>| <code>int atomic_read(atomic_t *v)</code> | 原子地读取 v 的值并返回。 | |</p>
+<p>| <code>void atomic_set(atomic_t *v, int i)</code> | 原子地向 v 写入 i 值。 | |</p>
+<p>| <code>void atomic_add(int i, atomic_t *v)</code> | 原子地给 v 加上 i。 | |</p>
+<p>| <code>void atomic_sub(int i, atomic_t *v)</code> | 原子地从 v 减去 i。 | |</p>
+<p>| <code>void atomic_inc(atomic_t *v)</code> | 原子递增（加 1）。 | |</p>
+<p>| <code>void atomic_dec(atomic_t *v)</code> | 原子递减（减 1）。 | |</p>
+<p>| <code>int atomic_dec_return(atomic_t *v)</code> | 原子递减，并返回****新值****。 | 注意笔记中是“返回值”，确切说是返回操作后的新值。 |</p>
+<p>| <code>int atomic_inc_return(atomic_t *v)</code> | 原子递增，并返回****新值****。 | 同上。 |</p>
+<p>| <code>int atomic_sub_and_test(int i, atomic_t *v)</code> | 原子地减 i，若****新值等于 0**** 返回真。 | |</p>
+<p>| <code>int atomic_dec_and_test(atomic_t *v)</code> | 原子递减，若新值为 0 返回真。 | |</p>
+<p>| <code>int atomic_inc_and_test(atomic_t *v)</code> | 原子递增，若新值为 0 返回真。 | |</p>
+<p>| <code>int atomic_add_negative(int i, atomic_t *v)</code> | 原子地加 i，若****新值为负数****返回真。 | |</p>
+<p><strong>### 2.1.2 原子位操作</strong></p>
+<p>用于操作内存中某个变量的特定位，无需定义原子变量。</p>
+<p>`&#96;&#96;c</p>
+<p>&#x2F;&#x2F; 示例：设置标志位</p>
+<p>unsigned long flags &#x3D; 0;</p>
+<p>set_bit(0, &amp;flags);</p>
+<p>`&#96;&#96;</p>
+<p>（具体API表你未列出，常与 <code>set_bit</code>, <code>clear_bit</code>, <code>test_bit</code> 等配合使用，用于共享的标志位管理）</p>
+<p>-–</p>
+<p><strong>## 2.2 自旋锁（Spinlock）</strong></p>
+<p><em><strong>*适用场景*</strong></em>：多核系统、临界区极短、不能休眠的情况（如中断上下文）。等待锁时忙等（自旋），不休眠。</p>
+<p><strong>### 2.2.1 基本操作 API</strong></p>
+<p>| 函数 | 描述 |</p>
+<p>| :— | :— |</p>
+<p>| <code>DEFINE_SPINLOCK(spinlock_t lock)</code> | 定义并静态初始化一个自旋锁。 |</p>
+<p>| <code>spin_lock_init(spinlock_t *lock)</code> | 动态初始化自旋锁。 |</p>
+<p>| <code>void spin_lock(spinlock_t *lock)</code> | 加锁。获取不到则自旋等待。 |</p>
+<p>| <code>void spin_unlock(spinlock_t *lock)</code> | 解锁。 |</p>
+<p>| <code>int spin_trylock(spinlock_t *lock)</code> | 尝试加锁。成功返回非0，失败返回0（不等待）。 |</p>
+<p>| <code>int spin_is_locked(spinlock_t *lock)</code> | 检查锁是否被持有。 |</p>
+<p><strong>### 2.2.2 中断安全 API（应对线程与中断的并发）</strong></p>
+<p>普通自旋锁不保护中断上下文，需配合中断屏蔽。</p>
+<p>| 函数 | 描述 |</p>
+<p>| :— | :— |</p>
+<p>| <code>void spin_lock_irq(spinlock_t *lock)</code> | <em><strong>*直接禁止本地中断*</strong></em>，然后加锁。 |</p>
+<p>| <code>void spin_unlock_irq(spinlock_t *lock)</code> | 解锁，并****直接使能本地中断****。 |</p>
+<p>| <code>void spin_lock_irqsave(spinlock_t *lock, unsigned long flags)</code> | ****保存当前中断状态****到flags，禁止中断，再加锁。 |</p>
+<p>| <code>void spin_unlock_irqrestore(spinlock_t *lock, unsigned long flags)</code> | 解锁，并****恢复****先前的中断状态。 |</p>
+<p>&gt; <em><strong>*推荐使用带</strong> <strong><code>save/restore</code></strong> <strong>的版本*</strong></em>：更安全，因为它不会无条件打开中断，适用于获取锁前中断原本就是关闭的场景。</p>
+<p><strong>### 2.2.3 使用自旋锁的注意事项（补充与强调）</strong></p>
+<p>- <em><strong>*严禁在临界区休眠&#x2F;阻塞*</strong></em>：</p>
+<p> - 原因：持有锁时内核抢占被禁止，若线程A休眠，CPU切换给线程B，B若也需此锁，将永久自旋，导致****死锁****。</p>
+<p> - 禁止调用的API包括：<code>copy_from_user</code>、<code>msleep</code>、可能阻塞的 <code>kmalloc</code>(GFP_KERNEL) 等。</p>
+<p>- <em><strong>*持有时间必须短*</strong></em>：否则影响系统实时性和吞吐量。</p>
+<p>- <em><strong>*不能递归上锁*</strong></em>：同一条线程重复获取同一把锁，会因自己持有锁不放而自旋至死。</p>
+<p>- <em><strong>*多核意识*</strong></em>：编写驱动时必须假设运行在多核系统，使用自旋锁保护。</p>
+<p>-–</p>
+<p><strong>## 2.3 信号量（Semaphore）</strong></p>
+<p><em><strong>*适用场景*</strong></em>：临界区较长、允许休眠、且不在中断上下文中使用的进程上下文。</p>
+<p><strong>### 2.3.1 特点</strong></p>
+<p>- <em><strong>*会导致休眠*</strong></em>：适合占用资源较久的场景。</p>
+<p>- <em><strong>*不能用于中断上下文*</strong></em>：中断不允许休眠。</p>
+<p>- <em><strong>*开销大于原子操作和自旋锁*</strong></em>：频繁切换上下文不适合极短临界区。</p>
+<p><strong>### 2.3.2 API 表</strong></p>
+<p>| 函数 | 描述 |</p>
+<p>| :— | :— |</p>
+<p>| <code>DEFINE_SEMAPHORE(name)</code> | 定义一个二元信号量（初值为1）。 |</p>
+<p>| <code>void sema_init(struct semaphore *sem, int val)</code> | 动态初始化信号量，可设定初值。 |</p>
+<p>| <code>void down(struct semaphore *sem)</code> | <em><strong>*获取（P操作）*</strong></em>。阻塞等待，休眠****不可被信号打断****。 |</p>
+<p>| <code>int down_interruptible(struct semaphore *sem)</code> | 获取信号量。进入休眠后****可被信号（如 Ctrl+C）打断****，返回错误码。 |</p>
+<p>| <code>int down_trylock(struct semaphore *sem)</code> | 尝试获取，不等待。成功返回0，失败返回非0。 |</p>
+<p>| <code>int down_killable(struct semaphore *sem)</code> | 可被致命信号（如 SIGKILL）打断的等待。 <strong>(补充)</strong> |</p>
+<p>| <code>void up(struct semaphore *sem)</code> | <em><strong>*释放（V操作）*</strong></em>。唤醒一个等待的线程。 |</p>
+<p>-–</p>
+<p><strong>## 2.4 互斥体（Mutex）</strong></p>
+<p><em><strong>*适用场景*</strong></em>：与信号量类似，但语义更严格，是专为实现互斥锁而设计的。推荐在进程上下文中优先使用。</p>
+<p><strong>### 2.4.1 特点与规则</strong></p>
+<p>- <em><strong>*会导致休眠*</strong></em>，不能在中断中使用。</p>
+<p>- <em><strong>*严格的一对一解锁*</strong></em>：哪个线程上锁，必须由它解锁。（信号量允许不同线程解锁）</p>
+<p>- <em><strong>*临界区内可休眠*</strong></em>：支持调用阻塞性API。</p>
+<p>- <em><strong>*不能递归上锁解锁*</strong></em>。</p>
+<p><strong>### 2.4.2 API 表</strong></p>
+<p>| 函数 | 描述 |</p>
+<p>| :— | :— |</p>
+<p>| <code>DEFINE_MUTEX(name)</code> | 静态定义并初始化。 |</p>
+<p>| <code>void mutex_init(mutex *lock)</code> | 动态初始化。 |</p>
+<p>| <code>void mutex_lock(struct mutex *lock)</code> | 上锁，获取不到则进入不可中断的休眠（<code>TASK_UNINTERRUPTIBLE</code>）。 |</p>
+<p>| <code>int mutex_lock_interruptible(struct mutex *lock)</code> | 可被信号打断的等待版本。 <strong>(补充)</strong> |</p>
+<p>| <code>int mutex_trylock(struct mutex *lock)</code> | 尝试上锁，成功返回1，失败返回0。 |</p>
+<p>| <code>void mutex_unlock(struct mutex *lock)</code> | 解锁。必须由持有者调用。 |</p>
+<p>| <code>int mutex_is_locked(struct mutex *lock)</code> | 判断是否被持有，返回1表示已上锁。 |</p>
+<p>-–</p>
+<p><strong>## 总结对比表</strong></p>
+<p>| 机制 | 持有锁时可否休眠？ | 适用上下文 | 适用临界区大小 | 主要开销 |</p>
+<p>| :— | :—: | :— | :— | :— |</p>
+<p>| <em><strong>*原子操作*</strong></em> | 不适用 | 所有（中断、进程） | 一个整数&#x2F;位 | 最小，CPU指令保证 |</p>
+<p>| <em><strong>*自旋锁*</strong></em> | <em><strong>*绝对不行*</strong></em> | 所有（中断、进程） | 极小（微秒级） | 忙等，CPU空转 |</p>
+<p>| <em><strong>*信号量*</strong></em> | 可以 | 仅进程上下文 | 大（毫秒级以上） | 上下文切换 |</p>
+<p>| <em><strong>*互斥体*</strong></em> | 可以 | 仅进程上下文 | 大（毫秒级以上） | 上下文切换 |</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Linux%E7%B3%BB%E7%BB%9F%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/" rel="tag"># Linux系统驱动开发</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2026/06/27/%E8%A3%B8%E6%9C%BA%E9%A9%B1%E5%8A%A8%E4%B9%8BRGBLCD/" rel="prev" title="裸机驱动之RGBLCD">
+      <i class="fa fa-chevron-left"></i> 裸机驱动之RGBLCD
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Huiting_Yang"
+      src="/images/troye.jpg">
+  <p class="site-author-name" itemprop="name">Huiting_Yang</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">22</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">13</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2026</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Huiting_Yang</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/pangu@4/dist/browser/pangu.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+<script src="/js/bookmark.js"></script>
+
+
+
+
+  
+
+
+
+
+  
+<script src="/js/local-search.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
