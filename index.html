@@ -188,6 +188,633 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://troyeeee673.github.io/2026/07/04/Linux%E9%A9%B1%E5%8A%A8%E4%B9%8B%E4%B8%AD%E6%96%AD%E5%92%8C%E5%AE%9A%E6%97%B6%E5%99%A8/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/troye.jpg">
+      <meta itemprop="name" content="Huiting_Yang">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Linux系统编程">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2026/07/04/Linux%E9%A9%B1%E5%8A%A8%E4%B9%8B%E4%B8%AD%E6%96%AD%E5%92%8C%E5%AE%9A%E6%97%B6%E5%99%A8/" class="post-title-link" itemprop="url">Linux驱动之中断和定时器</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2026-07-04 10:35:00 / 修改时间：10:35:42" itemprop="dateCreated datePublished" datetime="2026-07-04T10:35:00+08:00">2026-07-04</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux%E7%B3%BB%E7%BB%9F%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/" itemprop="url" rel="index"><span itemprop="name">Linux系统驱动开发</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p><strong># Linux内核中断</strong></p>
+<p><strong>## 裸机中断处理方法</strong></p>
+<p><strong>### 1. 整体流程</strong></p>
+<p>裸机中断处理分为三个核心步骤：</p>
+<p>\1. <em><strong>*使能中断*</strong></em>：配置相关寄存器</p>
+<p>\2. <em><strong>*注册中断服务函数*</strong></em>：填入中断向量表</p>
+<p>\3. <em><strong>*中断分发*</strong></em>：在 IRQ 入口函数中查表执行</p>
+<p><strong>### 2. 具体步骤详解</strong></p>
+<p><strong>#### （1）使能中断，初始化相关寄存器</strong></p>
+<p>- 使能****总中断开关****（如 ARM 的 CPSR 寄存器 I 位）</p>
+<p>- 配置具体外设的****中断使能寄存器****</p>
+<p>- 配置****中断控制器****（如 NVIC、GIC），设置优先级</p>
+<p><strong>#### （2）注册中断服务函数</strong></p>
+<p>- 维护一个****中断服务函数表****：<code>irqTable[ ]</code> 数组</p>
+<p>- 向数组的****指定标号处****写入对应的中断服务函数指针</p>
+<p>- 标号 &#x3D; 中断号（由硬件或中断控制器定义）</p>
+<p><strong>#### （3）中断处理分发流程</strong></p>
+<p>- 中断发生 → CPU 跳转到****IRQ 中断服务函数入口****</p>
+<p>- 在 IRQ 入口函数中：</p>
+<p> - 保存现场（寄存器压栈）</p>
+<p> - 读取中断控制器，获取当前发生的中断号</p>
+<p> - 以中断号为索引，去 <code>irqTable[ ]</code> 数组中查找对应的处理函数</p>
+<p> - 找到后跳转执行具体的中断处理</p>
+<p> - 恢复现场（寄存器出栈）</p>
+<p> - 返回被中断的代码</p>
+<p><strong>## 1.2 Linux 中断处理</strong></p>
+<p><strong>### 1. 中断使用流程</strong></p>
+<p>Linux 内核中中断处理的四个核心步骤:</p>
+<p>`&#96;&#96;</p>
+<p>\1. 获取中断号</p>
+<p>   ↓</p>
+<p>\2. 申请中断（request_irq）</p>
+<p>   ↓</p>
+<p>\3. 实现中断处理函数</p>
+<p>   ↓</p>
+<p>\4. 释放中断（free_irq）</p>
+<p>`&#96;&#96;</p>
+<p>-–</p>
+<p><strong>### 2. 步骤详解</strong></p>
+<p><strong>#### （1）获取中断号</strong></p>
+<p>在使用中断前，首先要知道设备对应的中断号。</p>
+<p>| 场景 | 获取方式 | 示例 |</p>
+<p>|——|———|——|</p>
+<p>| <em><strong>*GPIO 中断*</strong></em> | <code>gpio_to_irq(gpio_num)</code> | <code>irq = gpio_to_irq(18);</code> |</p>
+<p>| <em><strong>*设备树中断*</strong></em> | <code>irq_of_parse_and_map()</code> | <code>irq = irq_of_parse_and_map(node, 0);</code> |</p>
+<p>| <em><strong>*平台设备*</strong></em> | <code>platform_get_irq()</code> | <code>irq = platform_get_irq(pdev, 0);</code> |</p>
+<p>| <em><strong>*硬件固定*</strong></em> | 查芯片手册 | 如 UART 中断号、定时器中断号 |</p>
+<p>-–</p>
+<p><strong>#### （2）申请中断（request_irq）</strong></p>
+<p>`&#96;&#96;c</p>
+<p>#include &lt;linux&#x2F;interrupt.h&gt;</p>
+<p>int request_irq(unsigned int irq,        &#x2F;&#x2F; 中断号</p>
+<p>​        irq_handler_t handler,     &#x2F;&#x2F; 中断处理函数</p>
+<p>​        unsigned long flags,      &#x2F;&#x2F; 中断标志</p>
+<p>​        const char *name,        &#x2F;&#x2F; 设备名称</p>
+<p>​        void *dev_id);         &#x2F;&#x2F; 设备标识</p>
+<p>`&#96;&#96;</p>
+<p><em><strong>*参数说明：*</strong></em></p>
+<p>| 参数 | 作用 | 说明 |</p>
+<p>|——|——|——|</p>
+<p>| <code>irq</code> | 中断号 | 通过第一步获取 |</p>
+<p>| <code>handler</code> | 中断处理函数 | 发生中断时被回调 |</p>
+<p>| <code>flags</code> | 中断触发方式&#x2F;属性 | 见下方表格 |</p>
+<p>| <code>name</code> | 设备名称 | 在 <code>/proc/interrupts</code> 中显示 |</p>
+<p>| <code>dev_id</code> | 设备标识 | 用于共享中断时区分设备，通常传设备结构体指针 |</p>
+<p><em><strong>*常用标志（flags）：*</strong></em></p>
+<p>| 标志 | 说明 |</p>
+<p>|——|——|</p>
+<p>| <code>IRQF_SHARED</code> | 共享中断（多个设备共用同一中断号） |</p>
+<p>| <code>IRQF_TRIGGER_RISING</code> | 上升沿触发 |</p>
+<p>| <code>IRQF_TRIGGER_FALLING</code> | 下降沿触发 |</p>
+<p>| <code>IRQF_TRIGGER_HIGH</code> | 高电平触发 |</p>
+<p>| <code>IRQF_TRIGGER_LOW</code> | 低电平触发 |</p>
+<p>| <code>IRQF_ONESHOT</code> | 顶半部执行完才重新使能中断 |</p>
+<p><em><strong>*返回值：*</strong></em></p>
+<p>- <code>0</code>：申请成功</p>
+<p>- <code>-EINVAL</code>：中断号无效或处理函数为 NULL</p>
+<p>- <code>-EBUSY</code>：中断已被占用且不共享</p>
+<p>&gt; ⚠️ <em><strong>*注意*</strong></em>：<code>request_irq()</code> 会****自动使能&#x2F;激活中断****，无需额外操作。</p>
+<p>-–</p>
+<p><strong>#### （3）中断处理函数</strong></p>
+<p><em><strong>*函数原型：*</strong></em></p>
+<p>`&#96;&#96;c</p>
+<p>typedef irqreturn_t (*irq_handler_t)(int irq, void *dev_id);</p>
+<p>irqreturn_t my_interrupt_handler(int irq, void *dev_id);</p>
+<p>`&#96;&#96;</p>
+<p><em><strong>*参数说明：*</strong></em></p>
+<p>| 参数 | 说明 |</p>
+<p>|——|——|</p>
+<p>| <code>irq</code> | 触发的中断号（同一个函数可服务多个中断） |</p>
+<p>| <code>dev_id</code> | 与 <code>request_irq</code> 中传入的 <code>dev_id</code> 一致，用于区分设备 |</p>
+<p><em><strong>*返回值：*</strong></em></p>
+<p>| 返回值 | 含义 |</p>
+<p>|——–|——|</p>
+<p>| <code>IRQ_NONE</code> | 该中断不是本设备产生的（用于共享中断判断） |</p>
+<p>| <code>IRQ_HANDLED</code> | 中断已正确处理 |</p>
+<p>| <code>IRQ_WAKE_THREAD</code> | 唤醒中断线程（用于 threaded_irq） |</p>
+<p><em><strong>*中断处理函数中的限制：*</strong></em></p>
+<p>- 在****原子上下文****中执行，不能睡眠</p>
+<p>- 不能调用可能睡眠的函数（如 <code>mutex_lock()</code>、<code>msleep()</code>、<code>copy_from_user()</code> 等）</p>
+<p>- 执行时间要尽量短</p>
+<p>- 不能访问用户空间内存</p>
+<p>-–</p>
+<p><strong>#### （4）释放中断（free_irq）</strong></p>
+<p>`&#96;&#96;c</p>
+<p>void free_irq(unsigned int irq, void *dev_id);</p>
+<p>`&#96;&#96;</p>
+<p><em><strong>*参数：*</strong></em></p>
+<p>| 参数 | 说明 |</p>
+<p>|——|——|</p>
+<p>| <code>irq</code> | 要释放的中断号 |</p>
+<p>| <code>dev_id</code> | 必须与 <code>request_irq</code> 传入的 <code>dev_id</code> 一致 |</p>
+<p><em><strong>*作用：*</strong></em></p>
+<p>- 释放中断资源</p>
+<p>- 如果存在共享中断，只移除对应的 <code>dev_id</code></p>
+<p>- 会等待正在执行的中断处理函数完成</p>
+<p>&gt; ⚠️ <em><strong>*注意*</strong></em>：模块卸载时必须释放已申请的中断，否则会导致系统不稳定。</p>
+<p><strong>### 4. 与裸机中断的对比</strong></p>
+<p>| 对比项 | 裸机中断 | Linux 中断 |</p>
+<p>|——–|———|———–|</p>
+<p>| <em><strong>*中断号获取*</strong></em> | 查手册固定值 | API 动态获取 |</p>
+<p>| <em><strong>*中断注册*</strong></em> | 手动填写 <code>irqTable[]</code> 数组 | <code>request_irq()</code> 注册 |</p>
+<p>| <em><strong>*中断使能*</strong></em> | 手动操作寄存器 | <code>request_irq()</code> 自动激活 |</p>
+<p>| <em><strong>*中断释放*</strong></em> | 不需要 | <code>free_irq()</code> 释放资源 |</p>
+<p>| <em><strong>*中断处理函数*</strong></em> | 无返回值 | 必须有返回值（<code>IRQ_HANDLED</code>&#x2F;<code>IRQ_NONE</code>） |</p>
+<p>-–</p>
+<p><strong>### 5. 调试命令</strong></p>
+<p>`&#96;&#96;bash</p>
+<p># 查看中断统计信息</p>
+<p>cat &#x2F;proc&#x2F;interrupts</p>
+<p># 查看软中断统计</p>
+<p>cat &#x2F;proc&#x2F;softirqs</p>
+<p>`&#96;&#96;</p>
+<p>-–</p>
+<p><strong>### 6. 关键要点总结</strong></p>
+<p>| 要点 | 说明 |</p>
+<p>|——|——|</p>
+<p>| <em><strong>*先获取中断号*</strong></em> | 不能直接写死，尤其是 GPIO 中断 |</p>
+<p>| <em><strong>*request_irq 自动激活*</strong></em> | 不需要额外使能中断 |</p>
+<p>| <em><strong>*必须释放中断*</strong></em> | 模块卸载时调用 <code>free_irq()</code> |</p>
+<p>| <em><strong>*dev_id 要一致*</strong></em> | 申请和释放时传相同的指针 |</p>
+<p>| <em><strong>*处理函数要快*</strong></em> | 不要在中断中做耗时操作 |</p>
+<p>| <em><strong>*不能睡眠*</strong></em> | 中断处理函数中不能调用可能睡眠的函数 |</p>
+<p><strong>## Linux 中断底半部机制</strong></p>
+<p><strong>### 为什么需要底半部？</strong></p>
+<p>中断处理原则：<em><strong>*中断处理越快越好*</strong></em>（顶半部执行时间要短）</p>
+<p>| 机制 | 执行上下文 | 特点 |</p>
+<p>|——|———–|——|</p>
+<p>| <em><strong>*顶半部（硬中断）*</strong></em> | 原子上下文 | 快速响应，不能睡眠，执行耗时操作会阻塞系统 |</p>
+<p>| <em><strong>*底半部*</strong></em> | 软中断&#x2F;进程上下文 | 处理耗时的剩余工作，可被中断打断 |</p>
+<p><strong>### 1. 软中断（SoftIRQ）</strong></p>
+<p><strong>#### （1）核心数据结构</strong></p>
+<p>`&#96;&#96;c</p>
+<p>&#x2F;&#x2F; 内核定义 10 个软中断</p>
+<p>static struct softirq_action softirq_vec[NR_SOFTIRQS];</p>
+<p>&#x2F;&#x2F; 软中断类型枚举</p>
+<p>enum {</p>
+<p>  HI_SOFTIRQ &#x3D; 0,    &#x2F;&#x2F; 高优先级 tasklet</p>
+<p>  TIMER_SOFTIRQ,    &#x2F;&#x2F; 定时器软中断</p>
+<p>  NET_TX_SOFTIRQ,    &#x2F;&#x2F; 网络发送</p>
+<p>  NET_RX_SOFTIRQ,    &#x2F;&#x2F; 网络接收</p>
+<p>  BLOCK_SOFTIRQ,    &#x2F;&#x2F; 块设备</p>
+<p>  BLOCK_IOPOLL_SOFTIRQ,</p>
+<p>  TASKLET_SOFTIRQ,   &#x2F;&#x2F; 普通 tasklet</p>
+<p>  SCHED_SOFTIRQ,    &#x2F;&#x2F; 调度器</p>
+<p>  HRTIMER_SOFTIRQ,   &#x2F;&#x2F; 高精度定时器</p>
+<p>  RCU_SOFTIRQ,     &#x2F;&#x2F; RCU 锁</p>
+<p>  NR_SOFTIRQS &#x3D; 10</p>
+<p>};</p>
+<p>`&#96;&#96;</p>
+<p><strong>#### （2）软中断使用流程</strong></p>
+<p>`&#96;&#96;</p>
+<p>\1. 注册软中断 → open_softirq()</p>
+<p>\2. 触发软中断 → raise_softirq()</p>
+<p>\3. 内核在合适时机执行软中断处理函数</p>
+<p>`&#96;&#96;</p>
+<p><strong>#### （3）API 函数</strong></p>
+<p>`&#96;&#96;c</p>
+<p>#include &lt;linux&#x2F;interrupt.h&gt;</p>
+<p>&#x2F;&#x2F; 注册软中断</p>
+<p>void open_softirq(int nr, void (*action)(struct softirq_action *));</p>
+<p>&#x2F;&#x2F; 参数：nr &#x3D; 软中断号（如 NET_RX_SOFTIRQ）</p>
+<p>&#x2F;&#x2F;    action &#x3D; 软中断处理函数</p>
+<p>&#x2F;&#x2F; 触发软中断</p>
+<p>void raise_softirq(unsigned int nr);</p>
+<p>&#x2F;&#x2F; 参数：nr &#x3D; 要触发的软中断号</p>
+<p>`&#96;&#96;</p>
+<p><strong>#### （4）软中断特点</strong></p>
+<p>| 特点 | 说明 |</p>
+<p>|——|——|</p>
+<p>| <em><strong>*静态分配*</strong></em> | 编译时确定数量（10个），不能动态增加 |</p>
+<p>| <em><strong>*全局性*</strong></em> | 所有 CPU 共享，需考虑并发 |</p>
+<p>| <em><strong>*执行时机*</strong></em> | 硬件中断返回前、ksoftirqd 内核线程 |</p>
+<p>| <em><strong>*可重入*</strong></em> | 同一软中断可在不同 CPU 同时执行 |</p>
+<p>| <em><strong>*不能睡眠*</strong></em> | 在原子上下文中执行 |</p>
+<p>&gt; ⚠️ <em><strong>*驱动开发中一般不直接使用软中断*</strong></em>（太底层，并发复杂），而是使用更高级的 <em><strong>*tasklet*</strong></em>。</p>
+<p>-–</p>
+<p><strong>### 2. Tasklet（基于软中断实现）</strong></p>
+<p>Tasklet 是****基于软中断实现的更高级封装****，驱动开发中最常用的底半部机制。</p>
+<p><strong>#### （1）Tasklet 工作原理</strong></p>
+<p>`&#96;&#96;</p>
+<p>硬件中断发生</p>
+<p>  ↓</p>
+<p>顶半部（硬中断处理函数）</p>
+<p>  ↓</p>
+<p>调用 tasklet_schedule()</p>
+<p>  ↓</p>
+<p>将 tasklet 加入队列</p>
+<p>  ↓</p>
+<p>内核在 TASKLET_SOFTIRQ 软中断中执行</p>
+<p>  ↓</p>
+<p>tasklet 处理函数执行</p>
+<p>`&#96;&#96;</p>
+<p><strong>#### （2）Tasklet 使用流程</strong></p>
+<p>`&#96;&#96;</p>
+<p>\1. 定义 tasklet 结构体</p>
+<p>\2. 初始化 tasklet（绑定处理函数）</p>
+<p>\3. 在顶半部中调用 tasklet_schedule()</p>
+<p>\4. 内核自动调度执行 tasklet 处理函数</p>
+<p>`&#96;&#96;</p>
+<p><strong>#### （3）API 函数</strong></p>
+<p>`&#96;&#96;c</p>
+<p>#include &lt;linux&#x2F;interrupt.h&gt;</p>
+<p>&#x2F;&#x2F; 定义 tasklet 结构体</p>
+<p>struct tasklet_struct {</p>
+<p>  struct tasklet_struct *next;</p>
+<p>  unsigned long state;</p>
+<p>  atomic_t count;</p>
+<p>  void (*func)(unsigned long data);</p>
+<p>  unsigned long data;</p>
+<p>};</p>
+<p>&#x2F;&#x2F; 方式一：动态初始化（运行时）</p>
+<p>void tasklet_init(struct tasklet_struct *t,</p>
+<p>​         void (*func)(unsigned long data),</p>
+<p>​         unsigned long data);</p>
+<p>&#x2F;&#x2F; 方式二：静态初始化（编译时）</p>
+<p>#define DECLARE_TASKLET(name, func, data) \</p>
+<p>  struct tasklet_struct name &#x3D; { … }</p>
+<p>&#x2F;&#x2F; 调度 tasklet（在顶半部中调用）</p>
+<p>void tasklet_schedule(struct tasklet_struct *t);</p>
+<p>&#x2F;&#x2F; 禁止 tasklet 调度</p>
+<p>void tasklet_disable(struct tasklet_struct *t);</p>
+<p>void tasklet_disable_nosync(struct tasklet_struct *t);</p>
+<p>&#x2F;&#x2F; 使能 tasklet 调度</p>
+<p>void tasklet_enable(struct tasklet_struct *t);</p>
+<p>&#x2F;&#x2F; 终止 tasklet（会等待执行完成）</p>
+<p>void tasklet_kill(struct tasklet_struct *t);</p>
+<p>`&#96;&#96;</p>
+<p><strong>### 3. Tasklet 特点总结</strong></p>
+<p>| 特点 | 说明 |</p>
+<p>|——|——|</p>
+<p>| <em><strong>*基于软中断*</strong></em> | 基于 <code>TASKLET_SOFTIRQ</code> 或 <code>HI_SOFTIRQ</code> 实现 |</p>
+<p>| <em><strong>*串行执行*</strong></em> | 同一 tasklet 只能在一个 CPU 上执行，不会重入 |</p>
+<p>| <em><strong>*不能睡眠*</strong></em> | 仍在软中断上下文（原子环境） |</p>
+<p>| <em><strong>*适合中轻度工作*</strong></em> | 不能做太耗时的操作 |</p>
+<p>| <em><strong>*驱动开发常用*</strong></em> | 比软中断更简单、安全 |</p>
+<p>-–</p>
+<p><strong>### 4. 顶半部与底半部分工对比</strong></p>
+<p>| 对比项 | 顶半部（硬中断） | 底半部（Tasklet） |</p>
+<p>|——–|—————-|——————|</p>
+<p>| <em><strong>*响应速度*</strong></em> | 立即响应 | 延迟执行（内核调度） |</p>
+<p>| <em><strong>*能否睡眠*</strong></em> | ❌ 不能 | ❌ 不能（软中断上下文） |</p>
+<p>| <em><strong>*可中断*</strong></em> | 可被其他中断打断 | 可被中断打断 |</p>
+<p>| <em><strong>*执行时间*</strong></em> | 必须非常短 | 可稍长，但不宜过久 |</p>
+<p>| <em><strong>*主要工作*</strong></em> | 紧急响应、调度底半部 | 处理剩余工作 |</p>
+<p>-–</p>
+<p><strong>### 5. 关键要点总结</strong></p>
+<p>| 要点 | 说明 |</p>
+<p>|——|——|</p>
+<p>| <em><strong>*软中断数量固定*</strong></em> | 10 个，驱动一般不用 |</p>
+<p>| <em><strong>*tasklet 是软中断封装*</strong></em> | 基于 <code>TASKLET_SOFTIRQ</code> 实现 |</p>
+<p>| <em><strong>*两步使用*</strong></em> | ①初始化（绑定函数）②在顶半部调用 <code>tasklet_schedule()</code> |</p>
+<p>| <em><strong>*不能睡眠*</strong></em> | tasklet 仍运行在原子上下文 |</p>
+<p>| <em><strong>*模块卸载要</strong> <strong><code>tasklet_kill()</code></strong></em><strong>*</strong> | 确保 tasklet 执行完毕 |</p>
+<p><strong>## 3. 工作队列（Workqueue）</strong></p>
+<p><strong>### （1）为什么需要工作队列？</strong></p>
+<p>| 机制 | 能否睡眠 | 适用场景 |</p>
+<p>|——|———|———-|</p>
+<p>| 软中断 | ❌ 不能 | 高吞吐量、性能要求极高 |</p>
+<p>| Tasklet | ❌ 不能 | 驱动常用的底半部，轻度工作 |</p>
+<p>| <em><strong>*工作队列*</strong></em> | ✅ <em><strong>*可以睡眠*</strong></em> | <em><strong>*复杂、耗时、需要睡眠的操作*</strong></em> |</p>
+<p>&gt; 当底半部需要****大量计算、访问文件系统、等待信号量****等操作时，必须使用工作队列。</p>
+<p>-–</p>
+<p><strong>### （2）工作队列原理</strong></p>
+<p>工作队列将底半部工作****交给内核线程****执行，因此：</p>
+<p>- 运行在****进程上下文****，可以睡眠</p>
+<p>- 可以被调度，不占用中断上下文时间</p>
+<p>- 响应延迟稍大，但更安全</p>
+<p>`&#96;&#96;</p>
+<p>硬件中断发生</p>
+<p>  ↓</p>
+<p>顶半部（硬中断处理函数）— 快速响应</p>
+<p>  ↓</p>
+<p>调度工作队列（schedule_work &#x2F; queue_work）</p>
+<p>  ↓</p>
+<p>内核工作线程（kworker）唤醒</p>
+<p>  ↓</p>
+<p>工作队列处理函数执行（进程上下文，可睡眠）</p>
+<p>`&#96;&#96;</p>
+<p>-–</p>
+<p><strong>### （3）工作队列核心 API</strong></p>
+<p><strong>#### ① 共享工作队列（系统默认）</strong></p>
+<p>`&#96;&#96;c</p>
+<p>#include &lt;linux&#x2F;workqueue.h&gt;</p>
+<p>&#x2F;&#x2F; 定义工作结构体</p>
+<p>struct work_struct my_work;</p>
+<p>&#x2F;&#x2F; 初始化工作（绑定处理函数）</p>
+<p>INIT_WORK(&amp;my_work, my_work_func);</p>
+<p>&#x2F;&#x2F; 调度工作（加入系统默认工作队列）</p>
+<p>bool schedule_work(struct work_struct *work);</p>
+<p>&#x2F;&#x2F; 延时调度</p>
+<p>bool schedule_delayed_work(struct delayed_work *dwork, unsigned long delay);</p>
+<p>`&#96;&#96;</p>
+<p><strong>#### ② 自定义工作队列（独立线程）</strong></p>
+<p>`&#96;&#96;c</p>
+<p>&#x2F;&#x2F; 创建工作队列（返回指针）</p>
+<p>struct workqueue_struct *create_workqueue(const char *name);</p>
+<p>struct workqueue_struct *create_singlethread_workqueue(const char *name);</p>
+<p>&#x2F;&#x2F; 将工作放入自定义队列</p>
+<p>bool queue_work(struct workqueue_struct *wq, struct work_struct *work);</p>
+<p>&#x2F;&#x2F; 延时放入</p>
+<p>bool queue_delayed_work(struct workqueue_struct *wq,</p>
+<p>​            struct delayed_work *dwork,</p>
+<p>​            unsigned long delay);</p>
+<p>&#x2F;&#x2F; 销毁工作队列</p>
+<p>void destroy_workqueue(struct workqueue_struct *wq);</p>
+<p>`&#96;&#96;</p>
+<p>-–</p>
+<p><strong>### （4）工作结构体类型</strong></p>
+<p>| 结构体 | 说明 | 初始化函数 |</p>
+<p>|——–|——|———–|</p>
+<p>| <code>struct work_struct</code> | 普通工作 | <code>INIT_WORK()</code> |</p>
+<p>| <code>struct delayed_work</code> | 延时工作 | <code>INIT_DELAYED_WORK()</code> |</p>
+<p><em><strong>*工作处理函数原型：*</strong></em></p>
+<p>`&#96;&#96;c</p>
+<p>&#x2F;&#x2F; 普通工作函数</p>
+<p>void my_work_func(struct work_struct *work);</p>
+<p>&#x2F;&#x2F; 延时工作函数（同样原型）</p>
+<p>void my_delayed_work_func(struct work_struct *work);</p>
+<p>`&#96;&#96;</p>
+<p><strong>### （6）延时工作队列示例</strong></p>
+<p>`&#96;&#96;c</p>
+<p>#include &lt;linux&#x2F;module.h&gt;</p>
+<p>#include &lt;linux&#x2F;workqueue.h&gt;</p>
+<p>static struct delayed_work my_delayed_work;</p>
+<p>&#x2F;&#x2F; 延时工作处理函数</p>
+<p>static void my_delayed_work_func(struct work_struct *work)</p>
+<p>{</p>
+<p>  printk(KERN_INFO “Delayed work executed after 1 second\n”);</p>
+<p>}</p>
+<p>static int __init test_init(void)</p>
+<p>{</p>
+<p>  &#x2F;&#x2F; 初始化延时工作</p>
+<p>  INIT_DELAYED_WORK(&amp;my_delayed_work, my_delayed_work_func);</p>
+<p>  &#x2F;&#x2F; 1秒后执行</p>
+<p>  schedule_delayed_work(&amp;my_delayed_work, msecs_to_jiffies(1000));</p>
+<p>  return 0;</p>
+<p>}</p>
+<p>static void __exit test_exit(void)</p>
+<p>{</p>
+<p>  &#x2F;&#x2F; 取消延时工作</p>
+<p>  cancel_delayed_work(&amp;my_delayed_work);</p>
+<p>}</p>
+<p>module_init(test_init);</p>
+<p>module_exit(test_exit);</p>
+<p>MODULE_LICENSE(“GPL”);</p>
+<p>`&#96;&#96;</p>
+<p>-–</p>
+<p><strong>### （7）自定义工作队列示例</strong></p>
+<p>`&#96;&#96;c</p>
+<p>&#x2F;&#x2F; 定义独立工作队列</p>
+<p>static struct workqueue_struct *my_wq;</p>
+<p>static struct work_struct my_custom_work;</p>
+<p>static void my_custom_work_func(struct work_struct *work)</p>
+<p>{</p>
+<p>  printk(KERN_INFO “Custom workqueue executed\n”);</p>
+<p>}</p>
+<p>static int __init test_init(void)</p>
+<p>{</p>
+<p>  &#x2F;&#x2F; 1. 创建工作队列（独立内核线程）</p>
+<p>  my_wq &#x3D; create_workqueue(“my_wq”);</p>
+<p>  if (!my_wq) {</p>
+<p>​    printk(KERN_ERR “create_workqueue failed\n”);</p>
+<p>​    return -ENOMEM;</p>
+<p>  }</p>
+<p>  &#x2F;&#x2F; 2. 初始化工作</p>
+<p>  INIT_WORK(&amp;my_custom_work, my_custom_work_func);</p>
+<p>  &#x2F;&#x2F; 3. 放入自定义队列</p>
+<p>  queue_work(my_wq, &amp;my_custom_work);</p>
+<p>  return 0;</p>
+<p>}</p>
+<p>static void __exit test_exit(void)</p>
+<p>{</p>
+<p>  &#x2F;&#x2F; 确保工作完成</p>
+<p>  flush_workqueue(my_wq);</p>
+<p>  &#x2F;&#x2F; 销毁工作队列</p>
+<p>  destroy_workqueue(my_wq);</p>
+<p>}</p>
+<p>module_init(test_init);</p>
+<p>module_exit(test_exit);</p>
+<p>MODULE_LICENSE(“GPL”);</p>
+<p>`&#96;&#96;</p>
+<p>-–</p>
+<p><strong>### （8）三种底半部机制对比总结</strong></p>
+<p>| 对比项 | 软中断 | Tasklet | 工作队列 |</p>
+<p>|——–|——–|———|———-|</p>
+<p>| <em><strong>*执行上下文*</strong></em> | 原子上下文 | 原子上下文 | <em><strong>*进程上下文*</strong></em> |</p>
+<p>| <em><strong>*能否睡眠*</strong></em> | ❌ 不能 | ❌ 不能 | ✅ <em><strong>*可以*</strong></em> |</p>
+<p>| <em><strong>*响应延迟*</strong></em> | 最低 | 较低 | 较高 |</p>
+<p>| <em><strong>*并发性*</strong></em> | 全局，需考虑并发 | 串行，不会重入 | 可配置 |</p>
+<p>| <em><strong>*使用复杂度*</strong></em> | 复杂 | 简单 | 中等 |</p>
+<p>| <em><strong>*适用场景*</strong></em> | 高性能网络&#x2F;块设备 | 驱动通用底半部 | <em><strong>*复杂、耗时任务*</strong></em> |</p>
+<p>| <em><strong>*驱动开发常用*</strong></em> | ❌ 少用 | ✅ 常用 | ✅ 常用 |</p>
+<p>-–</p>
+<p><strong>### （9）关键要点总结</strong></p>
+<p>| 要点 | 说明 |</p>
+<p>|——|——|</p>
+<p>| <em><strong>*工作队列 &#x3D; 内核线程*</strong></em> | 工作在进程上下文，可以睡眠 |</p>
+<p>| <em><strong>*两种使用方式*</strong></em> | 系统默认队列（<code>schedule_work</code>）或自定义队列（<code>queue_work</code>） |</p>
+<p>| <em><strong>*适用场景*</strong></em> | 需要睡眠、耗时、复杂的底半部工作 |</p>
+<p>| <em><strong>*延时工作*</strong></em> | 使用 <code>schedule_delayed_work()</code> 可实现延时执行 |</p>
+<p>| <em><strong>*模块卸载*</strong></em> | 需调用 <code>flush_work()</code> 或 <code>flush_workqueue()</code> 确保工作完成 |</p>
+<p>| <em><strong>*自定义队列*</strong></em> | 可创建独立工作队列避免影响系统性能 |</p>
+<p>-–</p>
+<p><strong>### （10）三种机制选择建议</strong></p>
+<p>`&#96;&#96;</p>
+<p>中断发生 → 需要底半部处理</p>
+<p>  │</p>
+<p>  ├── 工作非常轻量、快速 → 直接在顶半部处理</p>
+<p>  │</p>
+<p>  ├── 需要睡眠、访问文件系统、耗时 → 使用工作队列</p>
+<p>  │</p>
+<p>  ├── 不需要睡眠，但有一定工作量 → 使用 Tasklet</p>
+<p>  │</p>
+<p>  └── 性能要求极高（网络&#x2F;块设备） → 使用软中断</p>
+<p>`&#96;&#96;</p>
+<p><strong>## 1.4 设备树中断节点信息</strong></p>
+<p><strong>### 1. 中断节点三大核心属性</strong></p>
+<p>| 属性 | 作用 | 说明 |</p>
+<p>|——|——|——|</p>
+<p>| <code>interrupt-controller</code> | 声明该节点为中断控制器 | 空属性，表示当前节点是一个中断控制器 |</p>
+<p>| <code>#interrupt-cells</code> | 指定 <code>interrupts</code> 属性中 cell 的数量 | 告诉设备树如何解析中断信息 |</p>
+<p>| <code>interrupt-parent</code> | 指定父中断控制器 | 设备引用哪个中断控制器，可向上继承 |</p>
+<p>-–</p>
+<p><strong>### 2. 中断控制器节点详解（以 GIC 为例）</strong></p>
+<p>`&#96;&#96;dts</p>
+<p>intc: interrupt-controller@00a01000 {</p>
+<p>  compatible &#x3D; “arm,cortex-a7-gic”;</p>
+<p>  #interrupt-cells &#x3D; &lt;3&gt;;      &#x2F;&#x2F; 每个中断用3个cell描述</p>
+<p>  interrupt-controller;        &#x2F;&#x2F; 声明为中断控制器</p>
+<p>  reg &#x3D; &lt;0x00a01000 0x1000&gt;,</p>
+<p>​     &lt;0x00a02000 0x100&gt;;</p>
+<p>};</p>
+<p>`&#96;&#96;</p>
+<p><em><strong>*</strong></em><em><code>#interrupt-cells = &lt;3&gt;</code></em>* <strong>含义：*</strong>*</p>
+<p>每个 <code>interrupts</code> 需要 3 个 cell：</p>
+<p>`&#96;&#96;dts</p>
+<p>interrupts &#x3D; &lt;中断类型 中断号 触发方式&gt;;</p>
+<p>`&#96;&#96;</p>
+<p>| Cell | 说明 | 常见值 |</p>
+<p>|——|——|——–|</p>
+<p>| 第1个 | 中断类型（SPI&#x2F;PPI&#x2F;SGI） | <code>GIC_SPI</code>(0)、<code>GIC_PPI</code>(1) |</p>
+<p>| 第2个 | 中断号 | 如 74、75 |</p>
+<p>| 第3个 | 触发方式 | <code>IRQ_TYPE_LEVEL_HIGH</code>、<code>IRQ_TYPE_EDGE_RISING</code> |</p>
+<p>-–</p>
+<p><strong>### 3. GPIO 中断控制器节点详解</strong></p>
+<p>`&#96;&#96;dts</p>
+<p>gpio5: gpio@020ac000 {</p>
+<p>  compatible &#x3D; “fsl,imx6ul-gpio”, “fsl,imx35-gpio”;</p>
+<p>  reg &#x3D; &lt;0x020ac000 0x4000&gt;;</p>
+<p>  interrupts &#x3D; &lt;GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH&gt;,</p>
+<p>​         &lt;GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH&gt;;</p>
+<p>  gpio-controller;          &#x2F;&#x2F; 声明为GPIO控制器</p>
+<p>  #gpio-cells &#x3D; &lt;2&gt;;         &#x2F;&#x2F; GPIO描述用2个cell</p>
+<p>  interrupt-controller;        &#x2F;&#x2F; 声明为中断控制器</p>
+<p>  #interrupt-cells &#x3D; &lt;2&gt;;       &#x2F;&#x2F; 中断描述用2个cell</p>
+<p>};</p>
+<p>`&#96;&#96;</p>
+<p><em><strong>*GPIO 中断的</strong> <strong><code>#interrupt-cells = &lt;2&gt;</code></strong> <strong>含义：*</strong></em></p>
+<p>`&#96;&#96;dts</p>
+<p>interrupts &#x3D; &lt;GPIO编号 触发方式&gt;;</p>
+<p>`&#96;&#96;</p>
+<p>| Cell | 说明 | 示例 |</p>
+<p>|——|——|——|</p>
+<p>| 第1个 | GPIO 引脚编号 | 0、1、2…（对应 GPIO5_IO00、GPIO5_IO01…） |</p>
+<p>| 第2个 | 触发方式 | 见下方表格 |</p>
+<p>-–</p>
+<p><strong>### 4. 设备中断节点详解（以 FXLS8471 为例）</strong></p>
+<p>`&#96;&#96;dts</p>
+<p>fxls8471@1e {</p>
+<p>  compatible &#x3D; “fsl,fxls8471”;</p>
+<p>  reg &#x3D; &lt;0x1e&gt;;</p>
+<p>  position &#x3D; &lt;0&gt;;</p>
+<p>  interrupt-parent &#x3D; &lt;&amp;gpio5&gt;;     &#x2F;&#x2F; 指定父中断控制器为 gpio5</p>
+<p>  interrupts &#x3D; &lt;0 8&gt;;         &#x2F;&#x2F; 使用 GPIO5_IO00，低电平有效</p>
+<p>};</p>
+<p>`&#96;&#96;</p>
+<p><em><strong>*解析过程：*</strong></em></p>
+<p>`&#96;&#96;</p>
+<p>interrupt-parent &#x3D; &lt;&amp;gpio5&gt;</p>
+<p>  → 查找 gpio5 节点的 #interrupt-cells &#x3D; &lt;2&gt;</p>
+<p>  → 知道 interrupts 有 2 个 cell</p>
+<p>interrupts &#x3D; &lt;0 8&gt;</p>
+<p>  → cell 0 &#x3D; GPIO 编号 &#x3D; 0（即 GPIO5_IO00）</p>
+<p>  → cell 1 &#x3D; 触发方式 &#x3D; 8（低电平有效）</p>
+<p>`&#96;&#96;</p>
+<p>-–</p>
+<p><strong>### 5. 触发方式编码表（第2个 cell）</strong></p>
+<p>| 值 | 触发方式 | 宏定义 | 说明 |</p>
+<p>|—-|———|——–|——|</p>
+<p>| 0 | 无触发 | - | 不使用中断 |</p>
+<p>| 1 | 上升沿触发 | <code>IRQ_TYPE_EDGE_RISING</code> | low-to-high edge triggered |</p>
+<p>| 2 | 下降沿触发 | <code>IRQ_TYPE_EDGE_FALLING</code> | high-to-low edge triggered |</p>
+<p>| 3 | 双边沿触发 | <code>IRQ_TYPE_EDGE_BOTH</code> | both edges |</p>
+<p>| 4 | 高电平触发 | <code>IRQ_TYPE_LEVEL_HIGH</code> | active high level-sensitive |</p>
+<p>| 8 | 低电平触发 | <code>IRQ_TYPE_LEVEL_LOW</code> | active low level-sensitive |</p>
+<p>&gt; ⚠️ <em><strong>*注意*</strong></em>：不同中断控制器可能使用不同的编码，如 GIC 使用独立宏定义（<code>IRQ_TYPE_LEVEL_HIGH</code> 等），GPIO 中断控制器则直接使用数字编号。具体值要参考对应控制器的绑定文档。</p>
+<p>-–</p>
+<p><strong>### 6. 完整解析流程</strong></p>
+<p>`&#96;&#96;</p>
+<p>设备节点 fxls8471</p>
+<p>  │</p>
+<p>  ├── interrupt-parent &#x3D; &lt;&amp;gpio5&gt;</p>
+<p>  │    ↓</p>
+<p>  │  查找 gpio5 节点</p>
+<p>  │    ↓</p>
+<p>  │  gpio5.#interrupt-cells &#x3D; &lt;2&gt;</p>
+<p>  │    ↓</p>
+<p>  │  说明 interrupts 有 2 个 cell</p>
+<p>  │</p>
+<p>  └── interrupts &#x3D; &lt;0 8&gt;</p>
+<p>​      ↓</p>
+<p>​    cell 0 &#x3D; 0 → GPIO5_IO00</p>
+<p>​    cell 1 &#x3D; 8 → 低电平有效</p>
+<p>​      ↓</p>
+<p>​    最终中断信息：GPIO5_IO00, 低电平触发</p>
+<p>`&#96;&#96;</p>
+<p>-–</p>
+<p><strong>### 7. 关键要点总结</strong></p>
+<p>| 要点 | 说明 |</p>
+<p>|——|——|</p>
+<p>| <em><strong>*</strong></em><em><code>interrupt-controller</code>*******</em> | 空属性，标记该节点为中断控制器 |</p>
+<p>| <em><strong>*</strong></em><em><code>#interrupt-cells</code>*******</em> | 指定子节点 <code>interrupts</code> 属性中 cell 的数量 |</p>
+<p>| <em><strong>*</strong></em><em><code>interrupt-parent</code>*******</em> | 指定设备使用哪个中断控制器（默认继承父节点） |</p>
+<p>| <em><strong>*</strong></em><em><code>interrupts</code>*******</em> | 具体的终端描述，cell 数量由 <code>#interrupt-cells</code> 决定 |</p>
+<p>| <em><strong>*GPIO 转中断*</strong></em> | GPIO 控制器的 <code>interrupts</code> 描述其自身连接到 GIC 的中断，子设备的 <code>interrupts</code> 描述 GPIO 引脚号和触发方式 |</p>
+<p>-–</p>
+<p><strong>### 8. 驱动中获取中断号</strong></p>
+<p>`&#96;&#96;c</p>
+<p>&#x2F;&#x2F; 设备树节点中获取中断号</p>
+<p>struct device_node *np &#x3D; pdev-&gt;dev.of_node;</p>
+<p>int irq_num;</p>
+<p>&#x2F;&#x2F; 方式一：直接获取</p>
+<p>irq_num &#x3D; irq_of_parse_and_map(np, 0);  &#x2F;&#x2F; 获取第0个中断</p>
+<p>&#x2F;&#x2F; 方式二：platform 方式获取</p>
+<p>irq_num &#x3D; platform_get_irq(pdev, 0);</p>
+<p>&#x2F;&#x2F; 方式三：GPIO 方式获取（如果知道 GPIO 编号）</p>
+<p>int gpio &#x3D; of_get_gpio(np, 0);</p>
+<p>irq_num &#x3D; gpio_to_irq(gpio);</p>
+<p>`&#96;&#96;</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://troyeeee673.github.io/2026/06/28/Linux%E9%A9%B1%E5%8A%A8%E4%B9%8B%E5%B9%B6%E5%8F%91%E4%B8%8E%E7%AB%9E%E4%BA%89/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -2123,165 +2750,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="https://troyeeee673.github.io/2026/06/17/%E8%A3%B8%E6%9C%BA%E9%A9%B1%E5%8A%A8%E4%B9%8BCortex-A%E4%B8%AD%E6%96%AD/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/troye.jpg">
-      <meta itemprop="name" content="Huiting_Yang">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Linux系统编程">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2026/06/17/%E8%A3%B8%E6%9C%BA%E9%A9%B1%E5%8A%A8%E4%B9%8BCortex-A%E4%B8%AD%E6%96%AD/" class="post-title-link" itemprop="url">Cortex-A 中断</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2026-06-17 08:07:58 / 修改时间：08:20:28" itemprop="dateCreated datePublished" datetime="2026-06-17T08:07:58+08:00">2026-06-17</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/Linux%E8%A3%B8%E6%9C%BA%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/" itemprop="url" rel="index"><span itemprop="name">Linux裸机驱动开发</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h1 id="Cortex-A-中断"><a href="#Cortex-A-中断" class="headerlink" title="Cortex-A 中断"></a>Cortex-A 中断</h1><h2 id="1-Cortex-A-中断原理"><a href="#1-Cortex-A-中断原理" class="headerlink" title="1. Cortex-A 中断原理"></a>1. Cortex-A 中断原理</h2><p>中断是处理器响应外设事件的核心机制。对于 Cortex-A 裸机开发来说，需要重点理解三件事：中断向量表在哪里、异常发生后 CPU 跳到哪里、以及如何通过 GIC 找到真正发出请求的外设。</p>
-<h3 id="1-1-STM32-中断系统回顾"><a href="#1-1-STM32-中断系统回顾" class="headerlink" title="1.1 STM32 中断系统回顾"></a>1.1 STM32 中断系统回顾</h3><p>STM32 属于 Cortex-M 系列，和 Cortex-A 的中断组织方式不同，但可以先用它建立基本概念。</p>
-<h4 id="1-1-1-中断向量表"><a href="#1-1-1-中断向量表" class="headerlink" title="1.1.1 中断向量表"></a>1.1.1 中断向量表</h4><p>ARM 芯片通常从固定地址开始取指执行。程序开始的位置会存放中断向量表，中断向量表用于描述异常或中断对应的服务函数入口。</p>
-<p>对于 STM32 来说，向量表的第 1 项通常存放栈顶指针，后续项存放复位、中断、异常等入口地址。向量表中的入口地址如果配置错误，就会导致 CPU 跳转到错误位置，进而出现中断处理混乱的问题。</p>
-<h4 id="1-1-2-中断向量偏移"><a href="#1-1-2-中断向量偏移" class="headerlink" title="1.1.2 中断向量偏移"></a>1.1.2 中断向量偏移</h4><p>一般 ARM 处理器默认从 <code>0x00000000</code> 地址开始运行。对于 STM32，用户程序通常链接到片内 Flash 起始地址 <code>0x08000000</code>。如果代码从 <code>0x08000000</code> 开始执行，就需要告诉内核新的向量表位置。</p>
-<p>在 Cortex-M 中，这一步通过设置 <code>SCB-&gt;VTOR</code> 寄存器完成，也就是把新的中断向量表起始地址写入 <code>VTOR</code>。</p>
-<h4 id="1-1-3-NVIC-中断控制器"><a href="#1-1-3-NVIC-中断控制器" class="headerlink" title="1.1.3 NVIC 中断控制器"></a>1.1.3 NVIC 中断控制器</h4><p><code>NVIC</code> 是 Cortex-M 的嵌套向量中断控制器，主要负责：</p>
-<ul>
-<li>使能或关闭指定中断。</li>
-<li>设置中断优先级。</li>
-<li>管理中断挂起、响应和嵌套。</li>
-</ul>
-<h3 id="1-2-Cortex-A-中断系统"><a href="#1-2-Cortex-A-中断系统" class="headerlink" title="1.2 Cortex-A 中断系统"></a>1.2 Cortex-A 中断系统</h3><p>Cortex-A 的中断系统更接近操作系统使用的模型。CPU 只看到 IRQ、FIQ 等异常入口，具体是哪一个外设触发了中断，需要通过 GIC 进一步查询。</p>
-<h4 id="1-2-1-Cortex-A7-中断向量表"><a href="#1-2-1-Cortex-A7-中断向量表" class="headerlink" title="1.2.1 Cortex-A7 中断向量表"></a>1.2.1 Cortex-A7 中断向量表</h4><p>Cortex-A 的异常向量表包含 8 类异常入口，其中裸机驱动中最常关注的是 <code>IRQ</code>。与 STM32 不同，Cortex-A 的异常向量表通常需要开发者在启动文件中自行定义。</p>
-<h4 id="1-2-2-中断向量偏移"><a href="#1-2-2-中断向量偏移" class="headerlink" title="1.2.2 中断向量偏移"></a>1.2.2 中断向量偏移</h4><p>当前裸机例程通常从 <code>0x87800000</code> 开始运行，因此需要把异常向量表基地址设置为 <code>0x87800000</code>。在 Cortex-A 中，这通常通过向 CP15 协处理器的 <code>VBAR</code> 寄存器写入新的向量表基地址来完成。</p>
-<h4 id="1-2-3-GIC-中断控制器"><a href="#1-2-3-GIC-中断控制器" class="headerlink" title="1.2.3 GIC 中断控制器"></a>1.2.3 GIC 中断控制器</h4><p>Cortex-A 常用 <code>GIC</code>（Generic Interrupt Controller，通用中断控制器）管理中断。GIC 会把中断源分为三类：</p>
-<ul>
-<li><code>SGI</code>（Software Generated Interrupt，软件触发中断）：由软件写 <code>GICD_SGIR</code> 等寄存器触发，常用于多核之间通信。</li>
-<li><code>PPI</code>（Private Peripheral Interrupt，私有外设中断）：每个 CPU 核私有的中断，通常只能由指定核心处理。</li>
-<li><code>SPI</code>（Shared Peripheral Interrupt，共享外设中断）：多个 Core 共享的外设中断，是最常见的外设中断类型。GPIO、串口、定时器等外部中断通常属于 SPI。这里的 SPI 不是串行外设接口总线。</li>
-</ul>
-<h4 id="1-2-4-中断号"><a href="#1-2-4-中断号" class="headerlink" title="1.2.4 中断号"></a>1.2.4 中断号</h4><p>为了区分不同中断源，GIC 会为每个中断源分配唯一的中断 ID。每个 CPU 最多支持 1020 个中断 ID，编号范围为 <code>ID0~ID1019</code>。</p>
-<p>GIC 中断 ID 的典型分配如下：</p>
-<ul>
-<li><code>ID0~ID15</code>：分配给 <code>SGI</code>。</li>
-<li><code>ID16~ID31</code>：分配给 <code>PPI</code>。</li>
-<li><code>ID32~ID1019</code>：分配给 <code>SPI</code>。GPIO 中断、串口中断等外部中断通常位于这一区间。具体哪个 ID 对应哪个外设，由芯片厂商根据 SoC 设计定义。</li>
-</ul>
-<h3 id="1-3-IRQ-中断服务函数的编写思路"><a href="#1-3-IRQ-中断服务函数的编写思路" class="headerlink" title="1.3 IRQ 中断服务函数的编写思路"></a>1.3 IRQ 中断服务函数的编写思路</h3><p>在 Cortex-A 中，多个外设中断最终都会汇集到 CPU 的 IRQ 异常入口。因此软件需要先实现一个统一的 IRQ 总入口，再由总入口分发到具体外设的处理函数。</p>
-<h4 id="1-3-1-统一的-IRQ-总入口"><a href="#1-3-1-统一的-IRQ-总入口" class="headerlink" title="1.3.1 统一的 IRQ 总入口"></a>1.3.1 统一的 IRQ 总入口</h4><p>当任意外设（例如定时器、串口、GPIO）产生中断时，CPU 会跳转到固定的 IRQ 异常向量地址，执行统一的 IRQ 入口函数。</p>
-<p>这个入口函数通常不直接处理具体外设逻辑，而是先完成现场保护，然后读取 GIC 状态，确认到底是哪一个中断源发出了请求。</p>
-<h4 id="1-3-2-查找并运行具体的外设中断服务函数"><a href="#1-3-2-查找并运行具体的外设中断服务函数" class="headerlink" title="1.3.2 查找并运行具体的外设中断服务函数"></a>1.3.2 查找并运行具体的外设中断服务函数</h4><p>在 IRQ 总入口中，需要读取 GIC 的 CPU 接口寄存器，例如 <code>GICC_IAR</code>，从中获取当前中断的硬件中断号。</p>
-<p>拿到中断 ID 后，就可以把它作为索引，在提前注册好的函数指针数组中查找对应的外设处理函数，例如 <code>uart0_handler()</code>，然后调用该函数完成具体业务处理。</p>
-<p>由于 Cortex-A7 会把来自多个外设的中断汇集到 CPU 的 IRQ 信号线上，所以软件必须在总入口中通过 GIC 查出中断源编号，再跳转到各外设独立的处理函数中。这种设计也是现代操作系统中断分发机制的重要基础。</p>
-<h2 id="2-中断例程编写"><a href="#2-中断例程编写" class="headerlink" title="2. 中断例程编写"></a>2. 中断例程编写</h2><h3 id="2-1-编写按键中断例程"><a href="#2-1-编写按键中断例程" class="headerlink" title="2.1 编写按键中断例程"></a>2.1 编写按键中断例程</h3><p>本例程中，<code>KEY0</code> 使用 <code>UART1_CTS</code> 这个 IO。需要为 <code>UART1_CTS</code> 编写 GPIO 中断相关代码，包括 IO 配置、中断触发方式配置、中断使能以及中断回调函数注册。</p>
-<h3 id="2-2-修改-start-S"><a href="#2-2-修改-start-S" class="headerlink" title="2.2 修改 start.S"></a>2.2 修改 <code>start.S</code></h3><p>启动文件中需要添加中断向量表，并编写复位异常服务函数和 IRQ 异常服务函数。</p>
-<p>复位异常服务函数主要完成以下工作：</p>
-<ul>
-<li>关闭 I Cache、D Cache 和 MMU。</li>
-<li>设置处理器各工作模式下的 <code>SP</code> 指针。要使用 IRQ 中断，必须至少设置 IRQ 模式下的 <code>SP</code> 指针；为了启动阶段更稳妥，也可以统一设置各模式的 <code>SP</code>。</li>
-<li>清除 <code>.bss</code> 段。</li>
-<li>跳转到 C 入口函数，也就是 <code>main</code> 函数。</li>
-</ul>
-<h3 id="2-3-CP15-协处理器"><a href="#2-3-CP15-协处理器" class="headerlink" title="2.3 CP15 协处理器"></a>2.3 CP15 协处理器</h3><p>CP15 是 Cortex-A 中用于系统控制的重要协处理器。常用指令包括：</p>
-<ul>
-<li><code>MRC</code>：将 CP15 寄存器中的数据读取到 ARM 通用寄存器。</li>
-<li><code>MCR</code>：将 ARM 通用寄存器中的数据写入 CP15 寄存器。</li>
-</ul>
-<p><code>MCR</code> 指令格式如下：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">MCR&#123;cond&#125; p15, &lt;opc1&gt;, &lt;Rt&gt;, &lt;CRn&gt;, &lt;CRm&gt;, &lt;opc2&gt;</span><br></pre></td></tr></table></figure>
-
-<p>示例：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">MRC p15, 0, r0, c0, c0, 0</span><br></pre></td></tr></table></figure>
-
-<p>如果要关闭 I Cache、D Cache 和 MMU，需要配置 <code>SCTLR</code>（System Control Register，系统控制寄存器）。在 Cortex-A7 中，常见控制位包括：</p>
-<ul>
-<li><code>bit0</code>：控制 MMU 使能。</li>
-<li><code>bit1</code>：控制对齐检查。</li>
-<li><code>bit2</code>：控制 D Cache。</li>
-<li><code>bit11</code>：控制分支预测。</li>
-<li><code>bit12</code>：控制 I Cache。</li>
-</ul>
-<h3 id="2-4-中断向量偏移设置"><a href="#2-4-中断向量偏移设置" class="headerlink" title="2.4 中断向量偏移设置"></a>2.4 中断向量偏移设置</h3><p>新的异常向量表首地址需要写入 CP15 的 <code>VBAR</code> 寄存器。相关指令格式仍然使用 <code>MCR</code>：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">MCR&#123;cond&#125; p15, &lt;opc1&gt;, &lt;Rt&gt;, &lt;CRn&gt;, &lt;CRm&gt;, &lt;opc2&gt;</span><br></pre></td></tr></table></figure>
-
-<p>访问 <code>VBAR</code> 的典型指令如下：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">MRC p15, 0, r0, c12, c0, 0</span><br><span class="line">MCR p15, 0, r0, c12, c0, 0</span><br></pre></td></tr></table></figure>
-
-<p>其中 <code>MCR p15, 0, r0, c12, c0, 0</code> 用于把 <code>r0</code> 中保存的新向量表地址写入 <code>VBAR</code>。</p>
-<h3 id="2-5-IRQ-中断服务函数"><a href="#2-5-IRQ-中断服务函数" class="headerlink" title="2.5 IRQ 中断服务函数"></a>2.5 IRQ 中断服务函数</h3><p>IRQ 服务函数中需要访问 GIC 控制器。可以通过读取 CP15 的 <code>CBAR</code> 寄存器获取 GIC 相关寄存器组的基地址：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mrc p15, 4, r1, c15, c0, 0</span><br></pre></td></tr></table></figure>
-
-<p><code>CBAR</code> 寄存器保存了 GIC 控制器寄存器组的首地址。GIC 寄存器组中：</p>
-<ul>
-<li><code>0x1000~0x1FFF</code>：GIC Distributor，分发器。</li>
-<li><code>0x2000~0x3FFF</code>：GIC CPU Interface，CPU 接口端。</li>
-</ul>
-<p>代码中，<code>R1</code> 寄存器保存 GIC CPU 接口端基地址。随后读取 CPU 接口端的 <code>GICC_IAR</code> 寄存器，并把值保存到 <code>R0</code>。</p>
-<p><code>GICC_IAR</code> 的 <code>bit9~0</code> 保存当前中断 ID。读取中断 ID 的目的，是为了找到并调用对应的中断处理函数。</p>
-<p><code>system_irqhandler</code> 是具体的中断分发处理函数，它的参数通常是 <code>GICC_IAR</code> 寄存器的值。该函数完成具体中断处理后，需要把对应的中断 ID 写入 <code>GICC_EOIR</code>，通知 GIC 当前中断已经处理结束。</p>
-<h3 id="2-6-i-MX6ULL-GPIO-中断设置"><a href="#2-6-i-MX6ULL-GPIO-中断设置" class="headerlink" title="2.6 i.MX6ULL GPIO 中断设置"></a>2.6 i.MX6ULL GPIO 中断设置</h3><p>GPIO 中断配置通常包括三步：</p>
-<ul>
-<li>设置 GPIO 的中断触发方式，也就是配置 <code>GPIO_ICR1</code> 或 <code>GPIO_ICR2</code> 寄存器。触发方式包括低电平、高电平、上升沿和下降沿。本例程中，<code>KEY0</code> 对应的 <code>UART1_CTS</code> IO 设置为下降沿触发。</li>
-<li>使能 GPIO 对应的中断，也就是配置 <code>GPIO_IMR</code> 寄存器。</li>
-<li>中断处理完成后清除中断标志位，也就是写 <code>GPIO_ISR</code> 寄存器的相应位。<code>GPIO_ISR</code> 采用写 1 清零机制。</li>
-</ul>
-<h3 id="2-7-GIC-配置"><a href="#2-7-GIC-配置" class="headerlink" title="2.7 GIC 配置"></a>2.7 GIC 配置</h3><p>GIC 侧需要完成以下配置：</p>
-<ul>
-<li>使能对应的中断 ID。<code>GPIO1_IO18</code> 对应的外设中断号为 67，换算到 GIC SPI 中断 ID 为 <code>67 + 32 = 99</code>。</li>
-<li>设置中断优先级。</li>
-<li>注册 <code>GPIO1_IO18</code> 的中断处理函数。</li>
-</ul>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -2353,7 +2821,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">22</span>
+          <span class="site-state-item-count">23</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
