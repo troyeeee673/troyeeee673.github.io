@@ -28,7 +28,7 @@
 <meta property="og:description" content="协议UART通用异步收发器：点对点，单端 是一种串行、异步通信总线，有两根数据线，可以实现全双工发送和接收数据。 在UART中，规定先发送低位数据，每次发送的数据帧包含起始位一位，数据位5~8位，校验位一位（可有可无），停止位1、1.5、2位。每次最多只能发送8位数据，要发送下一字节，必须先停止，再重复上述过程。这是为了防止接收双发方时钟有误差导致误差积累，数据错位。 缺点：电器接口不统一：  只">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2026-06-08T09:46:52.000Z">
-<meta property="article:modified_time" content="2026-06-08T09:56:58.555Z">
+<meta property="article:modified_time" content="2026-07-12T05:37:34.688Z">
 <meta property="article:author" content="Huiting_Yang">
 <meta property="article:tag" content="综合">
 <meta name="twitter:card" content="summary">
@@ -216,10 +216,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2026-06-08 17:46:52 / 修改时间：17:56:58" itemprop="dateCreated datePublished" datetime="2026-06-08T17:46:52+08:00">2026-06-08</time>
+              <time title="创建时间：2026-06-08 17:46:52" itemprop="dateCreated datePublished" datetime="2026-06-08T17:46:52+08:00">2026-06-08</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2026-07-12 13:37:34" itemprop="dateModified" datetime="2026-07-12T13:37:34+08:00">2026-07-12</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="far fa-folder"></i>
@@ -392,6 +398,216 @@
 <li>睡眠模式</li>
 <li>AWUM模式</li>
 </ul>
+<h1 id="I2S-总线（Inter-IC-Sound-Bus）"><a href="#I2S-总线（Inter-IC-Sound-Bus）" class="headerlink" title="I2S 总线（Inter-IC Sound Bus）"></a>I2S 总线（Inter-IC Sound Bus）</h1><h2 id="一、概述"><a href="#一、概述" class="headerlink" title="一、概述"></a>一、概述</h2><p>I2S（Inter-IC Sound）总线，又称集成电路内置音频总线，是<strong>飞利浦公司</strong>于 1986 年为数字音频设备之间的音频数据传输而制定的一种串行总线标准。该总线专门用于音频设备之间传输<strong>未经压缩的 PCM&#x2F;PDM 音频数据裸流</strong>。</p>
+<h3 id="核心特性"><a href="#核心特性" class="headerlink" title="核心特性"></a>核心特性</h3><table>
+<thead>
+<tr>
+<th>特性</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>传输方式</strong></td>
+<td>串行同步传输（一位一位地传输）</td>
+</tr>
+<tr>
+<td><strong>工作模式</strong></td>
+<td>支持主模式（Master）和从模式（Slave）</td>
+</tr>
+<tr>
+<td><strong>方向性</strong></td>
+<td>支持全双工（同时收发）和半双工</td>
+</tr>
+<tr>
+<td><strong>数据格式</strong></td>
+<td>传输 PCM（脉冲编码调制）或 PDM（脉冲密度调制）音频数据</td>
+</tr>
+<tr>
+<td><strong>应用场景</strong></td>
+<td>ADC&#x2F;DAC、数字信号处理器（DSP）、蓝牙音频、HDMI 音频等</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="二、I2S-总线信号线"><a href="#二、I2S-总线信号线" class="headerlink" title="二、I2S 总线信号线"></a>二、I2S 总线信号线</h2><p>I2S 总线通常包含以下 <strong>4 根信号线</strong>（部分场景可减少为 3 根）：</p>
+<table>
+<thead>
+<tr>
+<th>信号线</th>
+<th>全称</th>
+<th>方向</th>
+<th>功能说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>SCLK &#x2F; BCLK</strong></td>
+<td>Serial Clock &#x2F; Bit Clock</td>
+<td>主→从</td>
+<td><strong>位时钟</strong>，用于同步每一位数据的传输。频率 &#x3D; 采样率 × 位宽 × 声道数。</td>
+</tr>
+<tr>
+<td><strong>LRCK &#x2F; WS</strong></td>
+<td>Left&#x2F;Right Clock &#x2F; Word Select</td>
+<td>主→从</td>
+<td><strong>帧时钟（字选择）</strong>，用于切换左右声道。频率 &#x3D; 采样率。<br>• 低电平 &#x3D; 左声道（Left Channel）<br>• 高电平 &#x3D; 右声道（Right Channel）</td>
+</tr>
+<tr>
+<td><strong>SDATA &#x2F; SD &#x2F; DIN &#x2F; DOUT</strong></td>
+<td>Serial Data</td>
+<td>双向</td>
+<td><strong>数据线</strong>，传输音频数据。<br>• 全双工时需两根：SDI（输入）、SDO（输出）<br>• 半双工时可用一根</td>
+</tr>
+<tr>
+<td><strong>MCLK</strong></td>
+<td>Master Clock</td>
+<td>主→从</td>
+<td><strong>主时钟</strong>（可选），由主控制器提供给 Codec 作为内部工作时钟。频率通常为采样率的 256、384 或 512 倍（如 256fs）。<br>部分芯片可内部 PLL 倍频生成，无需外部 MCLK。</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p><strong>注</strong>：I2S 总线的设备分为<strong>主设备（Master）</strong> 和<strong>从设备（Slave）</strong>。主设备负责产生 BCLK 和 LRCK，从设备接收这两个时钟信号进行同步。主设备通常是 CPU&#x2F;SoC，从设备通常是 Codec&#x2F;ADC&#x2F;DAC。</p>
+</blockquote>
+<hr>
+<h2 id="三、I2S-数据格式与时序"><a href="#三、I2S-数据格式与时序" class="headerlink" title="三、I2S 数据格式与时序"></a>三、I2S 数据格式与时序</h2><h3 id="3-1-基本时序特点"><a href="#3-1-基本时序特点" class="headerlink" title="3.1 基本时序特点"></a>3.1 基本时序特点</h3><ul>
+<li><strong>数据采样</strong>：数据在 <strong>BCLK 的上升沿被采样</strong>（由接收方锁存）。</li>
+<li><strong>数据变化</strong>：数据在 <strong>BCLK 的下降沿发生变化</strong>（由发送方更新）。</li>
+<li><strong>MSB 优先</strong>：高位在前（MSB First），低位在后（LSB Last）。</li>
+<li><strong>左声道在前</strong>：标准 I2S 格式中，<strong>左声道数据先传输</strong>。</li>
+</ul>
+<h3 id="3-2-标准-I2S-时序（飞利浦标准）"><a href="#3-2-标准-I2S-时序（飞利浦标准）" class="headerlink" title="3.2 标准 I2S 时序（飞利浦标准）"></a>3.2 标准 I2S 时序（飞利浦标准）</h3><p><strong>关键规则</strong>：</p>
+<ol>
+<li><strong>数据在 LRCK 变化后的第 2 个 BCLK 周期开始传输 MSB</strong>。</li>
+<li>数据在 BCLK 的<strong>下降沿变化</strong>，在<strong>上升沿被采样</strong>。</li>
+<li>数据与 LRCK 之间存在 <strong>1 个 BCLK 周期的延迟</strong>（该延迟称为 <strong>Data Delay</strong> 或 <strong>Transmission Delay</strong>）。</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">         +---+   +---+   +---+   +---+   +---+   +---+</span><br><span class="line">BCLK     |   |   |   |   |   |   |   |   |   |   |   |</span><br><span class="line">         +   +---+   +---+   +---+   +---+   +---+   +---+</span><br><span class="line">         |&lt;---&gt;|&lt;---&gt;|&lt;---&gt;|&lt;---&gt;|&lt;---&gt;|&lt;---&gt;|&lt;---&gt;|&lt;---&gt;</span><br><span class="line">LRCK     |   左声道 (低)       |   右声道 (高)        |</span><br><span class="line">         +--------------------+--------------------+</span><br><span class="line">         |  |  |  |  |  |  |  |  |  |  |  |  |  |  |</span><br><span class="line">SDATA    |  |  X  |  MSB  |  ...  |  LSB  |  X  |  |  |  MSB  |  ...  |</span><br><span class="line">         |&lt;- 1 BCLK 延迟 -&gt;&lt;- 左声道 32/24/16 bit -&gt;&lt;- 右声道 32/24/16 bit -&gt;</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p><strong>图解说明</strong>：</p>
+<ul>
+<li>LRCK 跳变后，数据线 <strong>延迟 1 个 BCLK 周期</strong> 才开始传输有效数据。</li>
+<li>每个声道的数据长度为<strong>固定的位宽</strong>（如 16bit、24bit、32bit）。</li>
+<li>如果实际数据小于位宽，<strong>多余位填充 0</strong>。</li>
+</ul>
+</blockquote>
+<h3 id="3-3-四种常见-I2S-变种格式"><a href="#3-3-四种常见-I2S-变种格式" class="headerlink" title="3.3 四种常见 I2S 变种格式"></a>3.3 四种常见 I2S 变种格式</h3><p>在实际硬件中，除了标准的飞利浦 I2S 格式，还有几种常见的变种，<strong>配置时必须与 Codec 芯片的寄存器设置匹配</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>格式名称</th>
+<th>数据与 LRCK 的关系</th>
+<th>数据对齐方式</th>
+<th>典型应用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>标准 I2S（飞利浦）</strong></td>
+<td>延迟 1 个 BCLK，LRCK 先左后右</td>
+<td>MSB 从延迟后的第 1 个 BCLK 开始</td>
+<td>大多数音频 Codec</td>
+</tr>
+<tr>
+<td><strong>左对齐（Left-Justified）</strong></td>
+<td>无延迟，LRCK 跳变后立即开始传输数据</td>
+<td>MSB 对齐到 LRCK 跳变边沿</td>
+<td>部分老式 DAC</td>
+</tr>
+<tr>
+<td><strong>右对齐（Right-Justified）</strong></td>
+<td>无延迟，数据在 BCLK 周期末尾对齐</td>
+<td>LSB 对齐到 LRCK 跳变边沿</td>
+<td>部分低价 DAC</td>
+</tr>
+<tr>
+<td><strong>DSP 模式（Burst Mode）</strong></td>
+<td>使用帧同步信号（FSYNC）代替 LRCK，取消 50% 占空比要求</td>
+<td>数据连续传输，支持多时隙（TDM）</td>
+<td>多通道音频设备（如 8 通道阵列麦克风）</td>
+</tr>
+</tbody></table>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">对比图解（假设 16bit 数据）：</span><br><span class="line"></span><br><span class="line">标准 I2S：  LRCK ___/‾‾‾\___    数据延迟 1 BCLK 后开始</span><br><span class="line">左对齐：    LRCK ___/‾‾‾\___    数据与 LRCK 边沿对齐</span><br><span class="line">右对齐：    LRCK ___/‾‾‾\___    数据在 LRCK 边沿前刚好结束</span><br><span class="line">DSP模式：   FSYNC __/‾‾‾\___    无固定占空比，帧同步信号脉冲</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="四、I2S-传输模型（数据流向）"><a href="#四、I2S-传输模型（数据流向）" class="headerlink" title="四、I2S 传输模型（数据流向）"></a>四、I2S 传输模型（数据流向）</h2><p>典型的 I2S 音频数据传输链路如下：</p>
+<h3 id="4-1-全双工模式（录音-放音同时进行）"><a href="#4-1-全双工模式（录音-放音同时进行）" class="headerlink" title="4.1 全双工模式（录音 + 放音同时进行）"></a>4.1 全双工模式（录音 + 放音同时进行）</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">         +-----------------+</span><br><span class="line">         |   I2S 主设备     |</span><br><span class="line">         |  (CPU/SoC)      |</span><br><span class="line">         +-----------------+</span><br><span class="line">         | BCLK  |  LRCK   |  ← 主设备提供时钟</span><br><span class="line">         +-------+---------+</span><br><span class="line">         |  ↑    |  ↓      |</span><br><span class="line">         |  |    |  |      |</span><br><span class="line">SDATA_OUT |  |    |  |      | SDATA_IN</span><br><span class="line">(DACDAT)  |  |    |  |      | (ADCDAT)</span><br><span class="line">         |  |    |  |      |</span><br><span class="line">         ↓  |    |  ↓      |</span><br><span class="line">+----------------------------------+</span><br><span class="line">|          I2S 从设备               |</span><br><span class="line">|       (Codec/ADC/DAC)            |</span><br><span class="line">+----------------------------------+</span><br><span class="line">      放音数据流 (CPU → Codec)</span><br><span class="line">      录音数据流 (Codec → CPU)</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-2-单工模式（仅放音或仅录音）"><a href="#4-2-单工模式（仅放音或仅录音）" class="headerlink" title="4.2 单工模式（仅放音或仅录音）"></a>4.2 单工模式（仅放音或仅录音）</h3><ul>
+<li><strong>放音（Playback）</strong>：CPU（主）→ I2S → Codec（从）→ DAC → 喇叭&#x2F;耳机</li>
+<li><strong>录音（Capture）</strong>：麦克风 → ADC → Codec（从）→ I2S → CPU（主）</li>
+</ul>
+<hr>
+<h2 id="五、I2S-与其他音频协议的对比"><a href="#五、I2S-与其他音频协议的对比" class="headerlink" title="五、I2S 与其他音频协议的对比"></a>五、I2S 与其他音频协议的对比</h2><table>
+<thead>
+<tr>
+<th>协议</th>
+<th>信号线数量</th>
+<th>特点</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>I2S</strong></td>
+<td>3~4 根（BCLK+LRCK+SD+可选MCLK）</td>
+<td>双声道音频，应用最广泛</td>
+<td>消费音频、嵌入式设备</td>
+</tr>
+<tr>
+<td><strong>PCM（时分复用&#x2F;TDM）</strong></td>
+<td>3~4 根（BCLK+FSYNC+SD）</td>
+<td>支持多时隙传输，可扩展多通道</td>
+<td>VoIP、多麦克风阵列</td>
+</tr>
+<tr>
+<td><strong>AC97</strong></td>
+<td>5 根（BIT_CLK+SDATA_OUT+SDATA_IN+SYNC+RESET#）</td>
+<td>音频 + 控制命令混合在帧中</td>
+<td>老式 PC 音频（已淘汰）</td>
+</tr>
+<tr>
+<td><strong>PDM</strong></td>
+<td>2 根（CLK+DAT）</td>
+<td>数字麦克风直接输出，简化布线</td>
+<td>MEMS 数字麦克风</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p><strong>选择建议</strong>：I2S 是嵌入式 Linux 音频驱动中最常用的接口，几乎所有的 Audio Codec 都支持 I2S。</p>
+</blockquote>
+<hr>
+<h2 id="六、I2S-数据速率计算"><a href="#六、I2S-数据速率计算" class="headerlink" title="六、I2S 数据速率计算"></a>六、I2S 数据速率计算</h2><h3 id="6-1-基本公式"><a href="#6-1-基本公式" class="headerlink" title="6.1 基本公式"></a>6.1 基本公式</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">BCLK 频率 = 采样率 × 位宽 × 声道数</span><br><span class="line"></span><br><span class="line">示例：</span><br><span class="line">采样率 = 44.1kHz，位宽 = 16bit，立体声（2声道）</span><br><span class="line">BCLK = 44.1k × 16 × 2 = 1.4112 MHz</span><br></pre></td></tr></table></figure>
+
+<h3 id="6-2-MCLK-与采样率的关系"><a href="#6-2-MCLK-与采样率的关系" class="headerlink" title="6.2 MCLK 与采样率的关系"></a>6.2 MCLK 与采样率的关系</h3><p>MCLK 频率通常为采样率的整数倍：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">MCLK = 采样率 × 256  （最常见）</span><br><span class="line">MCLK = 采样率 × 384</span><br><span class="line">MCLK = 采样率 × 512</span><br><span class="line"></span><br><span class="line">示例：</span><br><span class="line">采样率 = 44.1kHz，256fs 模式</span><br><span class="line">MCLK = 44.1k × 256 = 11.2896 MHz</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="七、硬件连接要点"><a href="#七、硬件连接要点" class="headerlink" title="七、硬件连接要点"></a>七、硬件连接要点</h2><table>
+<thead>
+<tr>
+<th>要点</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>电平匹配</strong></td>
+<td>I2S 信号电平需匹配（如 3.3V 或 1.8V），否则需电平转换芯片</td>
+</tr>
+<tr>
+<td><strong>时钟抖动</strong></td>
+<td>MCLK&#x2F;BCLK 的时钟抖动会影响音质，应使用低抖动的时钟源</td>
+</tr>
+<tr>
+<td><strong>阻抗匹配</strong></td>
+<td>高速 I2S 信号需考虑 PCB 走线阻抗匹配，减少信号反射</td>
+</tr>
+<tr>
+<td><strong>共地</strong></td>
+<td>主从设备需保证 GND 良好连接，避免地环路噪声</td>
+</tr>
+<tr>
+<td><strong>MCLK 来源</strong></td>
+<td>可由 CPU 提供，也可由独立晶振提供。部分 Codec 支持 PLL 内部生成</td>
+</tr>
+</tbody></table>
+<hr>
 <h2 id="ModBus协议（应用层协议）"><a href="#ModBus协议（应用层协议）" class="headerlink" title="ModBus协议（应用层协议）"></a>ModBus协议（应用层协议）</h2><h3 id="及与串口的ModBus协议"><a href="#及与串口的ModBus协议" class="headerlink" title="及与串口的ModBus协议"></a>及与串口的ModBus协议</h3><p>Modbus是一种应用层协议，通常基于串口（RS-232&#x2F;485）或以太网（TCP&#x2F;IP）实现。它定义了一个与物理层无关的消息结构，采用主从通信模式。</p>
 <h4 id="RTU-远程终端单元"><a href="#RTU-远程终端单元" class="headerlink" title="RTU (远程终端单元)"></a>RTU (远程终端单元)</h4><ul>
 <li><strong>特点</strong>：使用二进制数据，采用CRC校验，消息帧无起始&#x2F;结束字符，通过“空闲时间”来分隔帧。效率高。</li>
@@ -496,7 +712,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8D%8F%E8%AE%AE"><span class="nav-number">1.</span> <span class="nav-text">协议</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#UART%E9%80%9A%E7%94%A8%E5%BC%82%E6%AD%A5%E6%94%B6%E5%8F%91%E5%99%A8%EF%BC%9A%E7%82%B9%E5%AF%B9%E7%82%B9%EF%BC%8C%E5%8D%95%E7%AB%AF"><span class="nav-number">1.1.</span> <span class="nav-text">UART通用异步收发器：点对点，单端</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#USART%E9%80%9A%E7%94%A8%E5%90%8C%E6%AD%A5-%E5%BC%82%E6%AD%A5%E6%94%B6%E5%8F%91%E5%99%A8%EF%BC%9A%E7%82%B9%E5%AF%B9%E7%82%B9%EF%BC%8C%E5%8D%95%E7%AB%AF"><span class="nav-number">1.2.</span> <span class="nav-text">USART通用同步&#x2F;异步收发器：点对点，单端</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#RS232-RS485%EF%BC%88%E7%94%B5%E5%99%A8%E5%B1%82%E5%8D%8F%E8%AE%AE%EF%BC%89"><span class="nav-number">1.3.</span> <span class="nav-text">RS232 &amp;&amp; RS485（电器层协议）</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#RS232%EF%BC%88%E4%B8%80%E7%A7%8D%E6%A0%87%E5%87%86%EF%BC%89%EF%BC%9A%E7%94%A8%E4%BA%8E%E6%94%B9%E5%96%84UART%E5%AD%98%E5%9C%A8%E7%9A%84%E4%B8%8D%E8%B6%B3%EF%BC%8C%E9%80%9A%E8%BF%87%E4%B8%80%E4%B8%AA%E7%94%B5%E5%B9%B3%E8%BD%AC%E6%8D%A2%E8%8A%AF%E7%89%87%E8%BF%9B%E8%A1%8CTTL%E5%92%8CRS232%E8%BD%AC%E6%8D%A2"><span class="nav-number">1.3.1.</span> <span class="nav-text">RS232（一种标准）：用于改善UART存在的不足，通过一个电平转换芯片进行TTL和RS232转换</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#RS485"><span class="nav-number">1.3.2.</span> <span class="nav-text">RS485</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#IIC-%E4%B8%B2%E8%A1%8C%E3%80%81%E5%8D%8A%E5%8F%8C%E5%B7%A5%EF%BC%8C%E7%94%A8%E4%BA%8E%E8%BF%91%E8%B7%9D%E7%A6%BB%EF%BC%8C%E4%BD%8E%E9%80%9F%E7%8E%87%E9%80%9A%E4%BF%A1%EF%BC%8C%E5%A4%9A%E4%B8%BB%E6%9C%BA%E9%80%9A%E4%BF%A1"><span class="nav-number">1.4.</span> <span class="nav-text">IIC:串行、半双工，用于近距离，低速率通信，多主机通信</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#SPI%EF%BC%88%E4%B8%B2%E8%A1%8C%E5%A4%96%E8%AE%BE%E6%8E%A5%E5%8F%A3%EF%BC%89%EF%BC%9A%E5%85%A8%E5%8F%8C%E5%B7%A5%EF%BC%8C%E9%AB%98%E9%80%9F%EF%BC%88%E7%9B%B8%E5%AF%B9%EF%BC%89%EF%BC%8C%E5%90%8C%E6%AD%A5"><span class="nav-number">1.5.</span> <span class="nav-text">SPI（串行外设接口）：全双工，高速（相对），同步</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#USB%EF%BC%9A%E9%80%9A%E7%94%A8%E4%B8%B2%E8%A1%8C%E6%80%BB%E7%BA%BF%EF%BC%8C%E5%92%8CUART%E4%B8%80%E6%A0%B7%E6%98%AF%E4%B8%80%E7%A7%8D%E5%8F%AF%E9%9D%A0%E7%9A%84%E5%8D%8F%E8%AE%AE%EF%BC%8C%E4%BD%8E%E4%BD%8D%E5%85%88%E8%A1%8C"><span class="nav-number">1.6.</span> <span class="nav-text">USB：通用串行总线，和UART一样是一种可靠的协议，低位先行</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#CAN%E6%80%BB%E7%BA%BF%EF%BC%88Controller-Area-NET-Bus%EF%BC%89%E6%8E%A7%E5%88%B6%E5%99%A8%E5%B1%80%E5%9F%9F%E7%BD%91%E6%80%BB%E7%BA%BF%EF%BC%9A%E5%A4%9A%E4%B8%AA%E4%B8%BB%E8%AE%BE%E5%A4%87%E7%9B%B8%E4%BA%92%E9%80%9A%E4%BF%A1"><span class="nav-number">1.7.</span> <span class="nav-text">CAN总线（Controller Area NET Bus）控制器局域网总线：多个主设备相互通信</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#CAN%E7%AE%80%E4%BB%8B"><span class="nav-number">1.7.1.</span> <span class="nav-text">CAN简介</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#CAN%E7%A1%AC%E4%BB%B6%E7%94%B5%E8%B7%AF"><span class="nav-number">1.7.2.</span> <span class="nav-text">CAN硬件电路</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#CAN%E7%94%B5%E5%B9%B3%E6%A0%87%E5%87%86"><span class="nav-number">1.7.3.</span> <span class="nav-text">CAN电平标准</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#CAN%E6%94%B6%E5%8F%91%E5%99%A8"><span class="nav-number">1.7.4.</span> <span class="nav-text">CAN收发器</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#CAN%E5%B8%A7%E6%A0%BC%E5%BC%8F"><span class="nav-number">1.7.5.</span> <span class="nav-text">CAN帧格式</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%B8%A7%EF%BC%88%E5%8F%91%E9%80%81%E8%AE%BE%E5%A4%87%E4%B8%BB%E5%8A%A8%E5%8F%91%E9%80%81%E5%B8%A7%E3%80%90%E5%B9%BF%E6%92%AD%E5%BC%8F%E3%80%91%EF%BC%89"><span class="nav-number">1.7.5.1.</span> <span class="nav-text">数据帧（发送设备主动发送帧【广播式】）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%81%A5%E6%8E%A7%E5%B8%A7%EF%BC%88%E6%8E%A5%E6%94%B6%E8%AE%BE%E5%A4%87%E4%B8%BB%E5%8A%A8%E8%AF%B7%E6%B1%82%E6%95%B0%E6%8D%AE%E3%80%90%E8%AF%B7%E6%B1%82%E5%BC%8F%E3%80%91%EF%BC%89"><span class="nav-number">1.7.5.2.</span> <span class="nav-text">遥控帧（接收设备主动请求数据【请求式】）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%94%99%E8%AF%AF%E5%B8%A7%EF%BC%88%E6%9F%90%E4%B8%AA%E8%AE%BE%E5%A4%87%E6%A3%80%E6%B5%8B%E5%88%B0%E9%94%99%E8%AF%AF%E6%97%B6%E5%90%91%E5%85%B6%E4%BB%96%E8%AE%BE%E5%A4%87%E5%8F%91%E9%80%81%E9%80%9A%E7%9F%A5%EF%BC%89"><span class="nav-number">1.7.5.3.</span> <span class="nav-text">错误帧（某个设备检测到错误时向其他设备发送通知）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%BF%87%E8%BD%BD%E5%B8%A7%EF%BC%88%E6%8E%A5%E6%94%B6%E8%AE%BE%E5%A4%87%E9%80%9A%E7%9F%A5%E5%8F%91%E9%80%81%E8%AE%BE%E5%A4%87%EF%BC%8C%E8%A1%A8%E6%98%8E%E8%87%AA%E5%B7%B1%E6%9C%AA%E5%81%9A%E5%A5%BD%E6%8E%A5%E6%94%B6%E5%87%86%E5%A4%87%EF%BC%89"><span class="nav-number">1.7.5.4.</span> <span class="nav-text">过载帧（接收设备通知发送设备，表明自己未做好接收准备）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%B8%A7%E9%97%B4%E9%9A%94%EF%BC%88%E7%94%A8%E4%BA%8E%E5%B0%86%E6%95%B0%E6%8D%AE%E5%B8%A7%E5%8F%8A%E9%81%A5%E6%8E%A7%E5%B8%A7%E4%B8%8E%E5%85%B6%E4%BB%96%E5%B8%A7%E5%8C%BA%E5%88%86%E5%BC%80%E6%9D%A5%EF%BC%89"><span class="nav-number">1.7.5.5.</span> <span class="nav-text">帧间隔（用于将数据帧及遥控帧与其他帧区分开来）</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BD%8D%E5%A1%AB%E5%85%85"><span class="nav-number">1.7.6.</span> <span class="nav-text">位填充</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8E%A5%E6%94%B6%E6%96%B9%E6%95%B0%E6%8D%AE%E9%87%87%E6%A0%B7%E5%92%8C%E4%BD%8D%E5%90%8C%E6%AD%A5"><span class="nav-number">1.7.7.</span> <span class="nav-text">接收方数据采样和位同步</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BB%B2%E8%A3%81"><span class="nav-number">1.7.8.</span> <span class="nav-text">仲裁</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86"><span class="nav-number">1.7.9.</span> <span class="nav-text">错误处理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BF%87%E6%BB%A4%E5%99%A8%EF%BC%88%E4%BB%A5STM32C8T6%E4%B8%BA%E4%BE%8B%EF%BC%89"><span class="nav-number">1.7.10.</span> <span class="nav-text">过滤器（以STM32C8T6为例）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B5%8B%E8%AF%95%E6%A8%A1%E5%BC%8F"><span class="nav-number">1.7.11.</span> <span class="nav-text">测试模式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B7%A5%E4%BD%9C%E6%A8%A1%E5%BC%8F"><span class="nav-number">1.7.12.</span> <span class="nav-text">工作模式</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ModBus%E5%8D%8F%E8%AE%AE%EF%BC%88%E5%BA%94%E7%94%A8%E5%B1%82%E5%8D%8F%E8%AE%AE%EF%BC%89"><span class="nav-number">1.8.</span> <span class="nav-text">ModBus协议（应用层协议）</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8F%8A%E4%B8%8E%E4%B8%B2%E5%8F%A3%E7%9A%84ModBus%E5%8D%8F%E8%AE%AE"><span class="nav-number">1.8.1.</span> <span class="nav-text">及与串口的ModBus协议</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#RTU-%E8%BF%9C%E7%A8%8B%E7%BB%88%E7%AB%AF%E5%8D%95%E5%85%83"><span class="nav-number">1.8.1.1.</span> <span class="nav-text">RTU (远程终端单元)</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#ASCII"><span class="nav-number">1.8.1.2.</span> <span class="nav-text">ASCII</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9F%BA%E4%BA%8E%E4%BB%A5%E5%A4%AA%E7%BD%91%E7%9A%84"><span class="nav-number">1.8.2.</span> <span class="nav-text">基于以太网的</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#TCP"><span class="nav-number">1.8.2.1.</span> <span class="nav-text">TCP</span></a></li></ol></li></ol></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%8D%8F%E8%AE%AE"><span class="nav-number">1.</span> <span class="nav-text">协议</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#UART%E9%80%9A%E7%94%A8%E5%BC%82%E6%AD%A5%E6%94%B6%E5%8F%91%E5%99%A8%EF%BC%9A%E7%82%B9%E5%AF%B9%E7%82%B9%EF%BC%8C%E5%8D%95%E7%AB%AF"><span class="nav-number">1.1.</span> <span class="nav-text">UART通用异步收发器：点对点，单端</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#USART%E9%80%9A%E7%94%A8%E5%90%8C%E6%AD%A5-%E5%BC%82%E6%AD%A5%E6%94%B6%E5%8F%91%E5%99%A8%EF%BC%9A%E7%82%B9%E5%AF%B9%E7%82%B9%EF%BC%8C%E5%8D%95%E7%AB%AF"><span class="nav-number">1.2.</span> <span class="nav-text">USART通用同步&#x2F;异步收发器：点对点，单端</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#RS232-RS485%EF%BC%88%E7%94%B5%E5%99%A8%E5%B1%82%E5%8D%8F%E8%AE%AE%EF%BC%89"><span class="nav-number">1.3.</span> <span class="nav-text">RS232 &amp;&amp; RS485（电器层协议）</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#RS232%EF%BC%88%E4%B8%80%E7%A7%8D%E6%A0%87%E5%87%86%EF%BC%89%EF%BC%9A%E7%94%A8%E4%BA%8E%E6%94%B9%E5%96%84UART%E5%AD%98%E5%9C%A8%E7%9A%84%E4%B8%8D%E8%B6%B3%EF%BC%8C%E9%80%9A%E8%BF%87%E4%B8%80%E4%B8%AA%E7%94%B5%E5%B9%B3%E8%BD%AC%E6%8D%A2%E8%8A%AF%E7%89%87%E8%BF%9B%E8%A1%8CTTL%E5%92%8CRS232%E8%BD%AC%E6%8D%A2"><span class="nav-number">1.3.1.</span> <span class="nav-text">RS232（一种标准）：用于改善UART存在的不足，通过一个电平转换芯片进行TTL和RS232转换</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#RS485"><span class="nav-number">1.3.2.</span> <span class="nav-text">RS485</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#IIC-%E4%B8%B2%E8%A1%8C%E3%80%81%E5%8D%8A%E5%8F%8C%E5%B7%A5%EF%BC%8C%E7%94%A8%E4%BA%8E%E8%BF%91%E8%B7%9D%E7%A6%BB%EF%BC%8C%E4%BD%8E%E9%80%9F%E7%8E%87%E9%80%9A%E4%BF%A1%EF%BC%8C%E5%A4%9A%E4%B8%BB%E6%9C%BA%E9%80%9A%E4%BF%A1"><span class="nav-number">1.4.</span> <span class="nav-text">IIC:串行、半双工，用于近距离，低速率通信，多主机通信</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#SPI%EF%BC%88%E4%B8%B2%E8%A1%8C%E5%A4%96%E8%AE%BE%E6%8E%A5%E5%8F%A3%EF%BC%89%EF%BC%9A%E5%85%A8%E5%8F%8C%E5%B7%A5%EF%BC%8C%E9%AB%98%E9%80%9F%EF%BC%88%E7%9B%B8%E5%AF%B9%EF%BC%89%EF%BC%8C%E5%90%8C%E6%AD%A5"><span class="nav-number">1.5.</span> <span class="nav-text">SPI（串行外设接口）：全双工，高速（相对），同步</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#USB%EF%BC%9A%E9%80%9A%E7%94%A8%E4%B8%B2%E8%A1%8C%E6%80%BB%E7%BA%BF%EF%BC%8C%E5%92%8CUART%E4%B8%80%E6%A0%B7%E6%98%AF%E4%B8%80%E7%A7%8D%E5%8F%AF%E9%9D%A0%E7%9A%84%E5%8D%8F%E8%AE%AE%EF%BC%8C%E4%BD%8E%E4%BD%8D%E5%85%88%E8%A1%8C"><span class="nav-number">1.6.</span> <span class="nav-text">USB：通用串行总线，和UART一样是一种可靠的协议，低位先行</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#CAN%E6%80%BB%E7%BA%BF%EF%BC%88Controller-Area-NET-Bus%EF%BC%89%E6%8E%A7%E5%88%B6%E5%99%A8%E5%B1%80%E5%9F%9F%E7%BD%91%E6%80%BB%E7%BA%BF%EF%BC%9A%E5%A4%9A%E4%B8%AA%E4%B8%BB%E8%AE%BE%E5%A4%87%E7%9B%B8%E4%BA%92%E9%80%9A%E4%BF%A1"><span class="nav-number">1.7.</span> <span class="nav-text">CAN总线（Controller Area NET Bus）控制器局域网总线：多个主设备相互通信</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#CAN%E7%AE%80%E4%BB%8B"><span class="nav-number">1.7.1.</span> <span class="nav-text">CAN简介</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#CAN%E7%A1%AC%E4%BB%B6%E7%94%B5%E8%B7%AF"><span class="nav-number">1.7.2.</span> <span class="nav-text">CAN硬件电路</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#CAN%E7%94%B5%E5%B9%B3%E6%A0%87%E5%87%86"><span class="nav-number">1.7.3.</span> <span class="nav-text">CAN电平标准</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#CAN%E6%94%B6%E5%8F%91%E5%99%A8"><span class="nav-number">1.7.4.</span> <span class="nav-text">CAN收发器</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#CAN%E5%B8%A7%E6%A0%BC%E5%BC%8F"><span class="nav-number">1.7.5.</span> <span class="nav-text">CAN帧格式</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E5%B8%A7%EF%BC%88%E5%8F%91%E9%80%81%E8%AE%BE%E5%A4%87%E4%B8%BB%E5%8A%A8%E5%8F%91%E9%80%81%E5%B8%A7%E3%80%90%E5%B9%BF%E6%92%AD%E5%BC%8F%E3%80%91%EF%BC%89"><span class="nav-number">1.7.5.1.</span> <span class="nav-text">数据帧（发送设备主动发送帧【广播式】）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%81%A5%E6%8E%A7%E5%B8%A7%EF%BC%88%E6%8E%A5%E6%94%B6%E8%AE%BE%E5%A4%87%E4%B8%BB%E5%8A%A8%E8%AF%B7%E6%B1%82%E6%95%B0%E6%8D%AE%E3%80%90%E8%AF%B7%E6%B1%82%E5%BC%8F%E3%80%91%EF%BC%89"><span class="nav-number">1.7.5.2.</span> <span class="nav-text">遥控帧（接收设备主动请求数据【请求式】）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E9%94%99%E8%AF%AF%E5%B8%A7%EF%BC%88%E6%9F%90%E4%B8%AA%E8%AE%BE%E5%A4%87%E6%A3%80%E6%B5%8B%E5%88%B0%E9%94%99%E8%AF%AF%E6%97%B6%E5%90%91%E5%85%B6%E4%BB%96%E8%AE%BE%E5%A4%87%E5%8F%91%E9%80%81%E9%80%9A%E7%9F%A5%EF%BC%89"><span class="nav-number">1.7.5.3.</span> <span class="nav-text">错误帧（某个设备检测到错误时向其他设备发送通知）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%BF%87%E8%BD%BD%E5%B8%A7%EF%BC%88%E6%8E%A5%E6%94%B6%E8%AE%BE%E5%A4%87%E9%80%9A%E7%9F%A5%E5%8F%91%E9%80%81%E8%AE%BE%E5%A4%87%EF%BC%8C%E8%A1%A8%E6%98%8E%E8%87%AA%E5%B7%B1%E6%9C%AA%E5%81%9A%E5%A5%BD%E6%8E%A5%E6%94%B6%E5%87%86%E5%A4%87%EF%BC%89"><span class="nav-number">1.7.5.4.</span> <span class="nav-text">过载帧（接收设备通知发送设备，表明自己未做好接收准备）</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%B8%A7%E9%97%B4%E9%9A%94%EF%BC%88%E7%94%A8%E4%BA%8E%E5%B0%86%E6%95%B0%E6%8D%AE%E5%B8%A7%E5%8F%8A%E9%81%A5%E6%8E%A7%E5%B8%A7%E4%B8%8E%E5%85%B6%E4%BB%96%E5%B8%A7%E5%8C%BA%E5%88%86%E5%BC%80%E6%9D%A5%EF%BC%89"><span class="nav-number">1.7.5.5.</span> <span class="nav-text">帧间隔（用于将数据帧及遥控帧与其他帧区分开来）</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BD%8D%E5%A1%AB%E5%85%85"><span class="nav-number">1.7.6.</span> <span class="nav-text">位填充</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8E%A5%E6%94%B6%E6%96%B9%E6%95%B0%E6%8D%AE%E9%87%87%E6%A0%B7%E5%92%8C%E4%BD%8D%E5%90%8C%E6%AD%A5"><span class="nav-number">1.7.7.</span> <span class="nav-text">接收方数据采样和位同步</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BB%B2%E8%A3%81"><span class="nav-number">1.7.8.</span> <span class="nav-text">仲裁</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86"><span class="nav-number">1.7.9.</span> <span class="nav-text">错误处理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BF%87%E6%BB%A4%E5%99%A8%EF%BC%88%E4%BB%A5STM32C8T6%E4%B8%BA%E4%BE%8B%EF%BC%89"><span class="nav-number">1.7.10.</span> <span class="nav-text">过滤器（以STM32C8T6为例）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B5%8B%E8%AF%95%E6%A8%A1%E5%BC%8F"><span class="nav-number">1.7.11.</span> <span class="nav-text">测试模式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B7%A5%E4%BD%9C%E6%A8%A1%E5%BC%8F"><span class="nav-number">1.7.12.</span> <span class="nav-text">工作模式</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#I2S-%E6%80%BB%E7%BA%BF%EF%BC%88Inter-IC-Sound-Bus%EF%BC%89"><span class="nav-number">2.</span> <span class="nav-text">I2S 总线（Inter-IC Sound Bus）</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E6%A6%82%E8%BF%B0"><span class="nav-number">2.1.</span> <span class="nav-text">一、概述</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%A0%B8%E5%BF%83%E7%89%B9%E6%80%A7"><span class="nav-number">2.1.1.</span> <span class="nav-text">核心特性</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81I2S-%E6%80%BB%E7%BA%BF%E4%BF%A1%E5%8F%B7%E7%BA%BF"><span class="nav-number">2.2.</span> <span class="nav-text">二、I2S 总线信号线</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81I2S-%E6%95%B0%E6%8D%AE%E6%A0%BC%E5%BC%8F%E4%B8%8E%E6%97%B6%E5%BA%8F"><span class="nav-number">2.3.</span> <span class="nav-text">三、I2S 数据格式与时序</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-%E5%9F%BA%E6%9C%AC%E6%97%B6%E5%BA%8F%E7%89%B9%E7%82%B9"><span class="nav-number">2.3.1.</span> <span class="nav-text">3.1 基本时序特点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-%E6%A0%87%E5%87%86-I2S-%E6%97%B6%E5%BA%8F%EF%BC%88%E9%A3%9E%E5%88%A9%E6%B5%A6%E6%A0%87%E5%87%86%EF%BC%89"><span class="nav-number">2.3.2.</span> <span class="nav-text">3.2 标准 I2S 时序（飞利浦标准）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-3-%E5%9B%9B%E7%A7%8D%E5%B8%B8%E8%A7%81-I2S-%E5%8F%98%E7%A7%8D%E6%A0%BC%E5%BC%8F"><span class="nav-number">2.3.3.</span> <span class="nav-text">3.3 四种常见 I2S 变种格式</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81I2S-%E4%BC%A0%E8%BE%93%E6%A8%A1%E5%9E%8B%EF%BC%88%E6%95%B0%E6%8D%AE%E6%B5%81%E5%90%91%EF%BC%89"><span class="nav-number">2.4.</span> <span class="nav-text">四、I2S 传输模型（数据流向）</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-%E5%85%A8%E5%8F%8C%E5%B7%A5%E6%A8%A1%E5%BC%8F%EF%BC%88%E5%BD%95%E9%9F%B3-%E6%94%BE%E9%9F%B3%E5%90%8C%E6%97%B6%E8%BF%9B%E8%A1%8C%EF%BC%89"><span class="nav-number">2.4.1.</span> <span class="nav-text">4.1 全双工模式（录音 + 放音同时进行）</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-%E5%8D%95%E5%B7%A5%E6%A8%A1%E5%BC%8F%EF%BC%88%E4%BB%85%E6%94%BE%E9%9F%B3%E6%88%96%E4%BB%85%E5%BD%95%E9%9F%B3%EF%BC%89"><span class="nav-number">2.4.2.</span> <span class="nav-text">4.2 单工模式（仅放音或仅录音）</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81I2S-%E4%B8%8E%E5%85%B6%E4%BB%96%E9%9F%B3%E9%A2%91%E5%8D%8F%E8%AE%AE%E7%9A%84%E5%AF%B9%E6%AF%94"><span class="nav-number">2.5.</span> <span class="nav-text">五、I2S 与其他音频协议的对比</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81I2S-%E6%95%B0%E6%8D%AE%E9%80%9F%E7%8E%87%E8%AE%A1%E7%AE%97"><span class="nav-number">2.6.</span> <span class="nav-text">六、I2S 数据速率计算</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#6-1-%E5%9F%BA%E6%9C%AC%E5%85%AC%E5%BC%8F"><span class="nav-number">2.6.1.</span> <span class="nav-text">6.1 基本公式</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#6-2-MCLK-%E4%B8%8E%E9%87%87%E6%A0%B7%E7%8E%87%E7%9A%84%E5%85%B3%E7%B3%BB"><span class="nav-number">2.6.2.</span> <span class="nav-text">6.2 MCLK 与采样率的关系</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%83%E3%80%81%E7%A1%AC%E4%BB%B6%E8%BF%9E%E6%8E%A5%E8%A6%81%E7%82%B9"><span class="nav-number">2.7.</span> <span class="nav-text">七、硬件连接要点</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#ModBus%E5%8D%8F%E8%AE%AE%EF%BC%88%E5%BA%94%E7%94%A8%E5%B1%82%E5%8D%8F%E8%AE%AE%EF%BC%89"><span class="nav-number">2.8.</span> <span class="nav-text">ModBus协议（应用层协议）</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8F%8A%E4%B8%8E%E4%B8%B2%E5%8F%A3%E7%9A%84ModBus%E5%8D%8F%E8%AE%AE"><span class="nav-number">2.8.1.</span> <span class="nav-text">及与串口的ModBus协议</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#RTU-%E8%BF%9C%E7%A8%8B%E7%BB%88%E7%AB%AF%E5%8D%95%E5%85%83"><span class="nav-number">2.8.1.1.</span> <span class="nav-text">RTU (远程终端单元)</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#ASCII"><span class="nav-number">2.8.1.2.</span> <span class="nav-text">ASCII</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9F%BA%E4%BA%8E%E4%BB%A5%E5%A4%AA%E7%BD%91%E7%9A%84"><span class="nav-number">2.8.2.</span> <span class="nav-text">基于以太网的</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#TCP"><span class="nav-number">2.8.2.1.</span> <span class="nav-text">TCP</span></a></li></ol></li></ol></li></ol></li></ol></div>
       </div>
       <!--/noindex-->
 
