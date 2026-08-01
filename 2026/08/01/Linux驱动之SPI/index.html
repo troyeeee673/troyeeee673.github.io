@@ -20,14 +20,18 @@
     var CONFIG = {"hostname":"troyeeee673.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":"default"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":true,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":true,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":true,"trigger":"auto","top_n_per_article":5,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},"path":"search.json"};
   </script>
 
-  <meta property="og:type" content="article">
+  <meta name="description" content="一、SPI 驱动框架1.1 裸机下的 SPI 驱动框架首先编写 SPI 控制器驱动，bsp_spi.c 和 bsp_spi.h。最终提供 SPI 读写函数 spich0_readwrite_byte其次要编写具体的SPI芯片的驱动 1.2 Linux 下的 SPI 驱动框架主机控制器驱动：SOC 的 SPI 外设驱动设备驱动：具体的 SPI 芯片驱动 1.3 SPI 主机驱动 spi_master">
+<meta property="og:type" content="article">
 <meta property="og:title" content="Linux驱动之SPI.md">
 <meta property="og:url" content="https://troyeeee673.github.io/2026/08/01/Linux%E9%A9%B1%E5%8A%A8%E4%B9%8BSPI/index.html">
 <meta property="og:site_name" content="Linux系统编程">
+<meta property="og:description" content="一、SPI 驱动框架1.1 裸机下的 SPI 驱动框架首先编写 SPI 控制器驱动，bsp_spi.c 和 bsp_spi.h。最终提供 SPI 读写函数 spich0_readwrite_byte其次要编写具体的SPI芯片的驱动 1.2 Linux 下的 SPI 驱动框架主机控制器驱动：SOC 的 SPI 外设驱动设备驱动：具体的 SPI 芯片驱动 1.3 SPI 主机驱动 spi_master">
 <meta property="og:locale" content="zh_CN">
 <meta property="article:published_time" content="2026-08-01T09:04:07.000Z">
-<meta property="article:modified_time" content="2026-08-01T09:04:07.501Z">
+<meta property="article:modified_time" content="2026-08-01T09:10:24.086Z">
 <meta property="article:author" content="Huiting_Yang">
+<meta property="article:tag" content="Linux系统驱动开发">
+<meta property="article:tag" content="通信协议">
 <meta name="twitter:card" content="summary">
 
 <link rel="canonical" href="https://troyeeee673.github.io/2026/08/01/Linux%E9%A9%B1%E5%8A%A8%E4%B9%8BSPI/">
@@ -213,8 +217,18 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
+              
 
-              <time title="创建时间：2026-08-01 17:04:07" itemprop="dateCreated datePublished" datetime="2026-08-01T17:04:07+08:00">2026-08-01</time>
+              <time title="创建时间：2026-08-01 17:04:07 / 修改时间：17:10:24" itemprop="dateCreated datePublished" datetime="2026-08-01T17:04:07+08:00">2026-08-01</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Linux%E7%B3%BB%E7%BB%9F%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/" itemprop="url" rel="index"><span itemprop="name">Linux系统驱动开发</span></a>
+                </span>
             </span>
 
           
@@ -228,7 +242,26 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        
+        <h1 id="一、SPI-驱动框架"><a href="#一、SPI-驱动框架" class="headerlink" title="一、SPI 驱动框架"></a>一、SPI 驱动框架</h1><h2 id="1-1-裸机下的-SPI-驱动框架"><a href="#1-1-裸机下的-SPI-驱动框架" class="headerlink" title="1.1 裸机下的 SPI 驱动框架"></a>1.1 裸机下的 SPI 驱动框架</h2><p>首先编写 SPI 控制器驱动，bsp_spi.c 和 bsp_spi.h。最终提供 SPI 读写函数 spich0_readwrite_byte<br>其次要编写具体的SPI芯片的驱动</p>
+<h2 id="1-2-Linux-下的-SPI-驱动框架"><a href="#1-2-Linux-下的-SPI-驱动框架" class="headerlink" title="1.2 Linux 下的 SPI 驱动框架"></a>1.2 Linux 下的 SPI 驱动框架</h2><p>主机控制器驱动：SOC 的 SPI 外设驱动<br>设备驱动：具体的 SPI 芯片驱动</p>
+<h2 id="1-3-SPI-主机驱动"><a href="#1-3-SPI-主机驱动" class="headerlink" title="1.3 SPI 主机驱动"></a>1.3 SPI 主机驱动</h2><ul>
+<li>spi_master:将spi数据封装成一个spi_master</li>
+</ul>
+<h2 id="1-4-SPI设备驱动"><a href="#1-4-SPI设备驱动" class="headerlink" title="1.4 SPI设备驱动"></a>1.4 SPI设备驱动</h2><p>spi_device：每个 spi_device 下都有一个 spi_master。每个 SPI 设备，肯定挂载到了一个 SPI 控制器，比如 ICM20608 挂载到了 6ULL 的 ECSPI3 接口上。</p>
+<p>spi_driver：申请或者定义一个 spi_driver，然后初始化 spi_driver 中的各个成员变量，当 SPI 设备和驱动匹配以后，spi_driver 下的 probe 函数就会执行！<br>spi_driver 初始化成功以后需要向内核注册，函数为：spi_register_driver，当注销驱动的时候需要 spi_unregister_driver</p>
+<h1 id="二、驱动编写与测试"><a href="#二、驱动编写与测试" class="headerlink" title="二、驱动编写与测试"></a>二、驱动编写与测试</h1><p>1、修改设备树，添加 IO 相关信息<br>查看原理图，确定引脚编号<br>ECSPI3_SCLK      -&gt;    UART2_RXD<br>ECSPI3_MOSI      -&gt;    UART2_CTS<br>ECSPI3_SS0       -&gt;    UART2_TXD<br>ECSPI3_MISO      -&gt;    UART2_RTS  </p>
+<p>使用pinctl子系统进行io复用配置，设备树添加如下内容：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">pinctrl_ecspi3: ecspi3grp&#123;</span><br><span class="line">	fsl,pins = &lt;</span><br><span class="line">		MX6UL_PAD_UART2_TX_DATA__GPIO1_IO20        <span class="number">0x10b0</span></span><br><span class="line">		MX6UL_PAD_UART2_RX_DATA__ECSPI3_SCLK       <span class="number">0x10b1</span></span><br><span class="line">		MX6UL_PAD_UART2_CTS_B__ECSPI3_MOSI         <span class="number">0x10b1</span></span><br><span class="line">		MX6UL_PAD_UART2_RTS_B__ECSPI3_MISO         <span class="number">0x10b1</span></span><br><span class="line">	&gt;;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>2、在ECSPI3节点下创建icm20608子节点</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">&amp;ecspi3 &#123;</span><br><span class="line">    fsl,spi-num-chipselects = &lt;<span class="number">1</span>&gt;;	<span class="comment">/*1个片选*/</span></span><br><span class="line">    cs-gpio = &lt;&amp;gpio1 <span class="number">20</span> GPIO_ACTIVE_LOW&gt;;	<span class="comment">/*这里原来是cs-gpios,这个属性对应的是硬件片选，我要使用软件片选，所以改个名字，这样就不会触发硬件片选了*/</span></span><br><span class="line">    pinctrl-names = <span class="string">&quot;default&quot;</span>;</span><br><span class="line">    pinctrl<span class="number">-0</span> = &lt;&amp;pinctrl_ecspi3&gt;;</span><br><span class="line">    status = <span class="string">&quot;okay&quot;</span>;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//对应的spi芯片子节点</span></span><br><span class="line">    spidev0: icm20608@<span class="number">0</span> &#123;	<span class="comment">/*这里的0表示这个设备接到哪个硬件片选*/</span></span><br><span class="line">        compatible = <span class="string">&quot;alientek,icm20608&quot;</span>;</span><br><span class="line">        spi-max-frequency = &lt;<span class="number">8000000</span>&gt;;</span><br><span class="line">        reg = &lt;<span class="number">0</span>&gt;;</span><br><span class="line">    &#125;;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>3、编写驱动框架<br>    - 编写spi_driver结构体，初始化各个成员变量<br>    <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">    <span class="type">static</span> <span class="class"><span class="keyword">struct</span> <span class="title">spi_driver</span> <span class="title">icm20608_driver</span> =</span> &#123;</span><br><span class="line">    .probe = icm20608_probe,</span><br><span class="line">    .remove = icm20608_remove,</span><br><span class="line">    .driver = &#123;</span><br><span class="line">        .name = <span class="string">&quot;icm20608&quot;</span>,</span><br><span class="line">        .owner = THIS_MODULE,</span><br><span class="line">        .of_match_table = icm20608_of_match,</span><br><span class="line">    &#125;,</span><br><span class="line">    <span class="comment">/*如果不使用设备树，就要用id_table进行设备匹配*/</span></span><br><span class="line">    .id_table = icm20608_id,</span><br><span class="line"></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure><br>    - 在probe函数中，搭建字符设备框架，进行数据的读取<br>    - 在remove函数中，注销字符设备驱动，释放资源<br>    - 在入口函数中，注册spi_driver结构体，使用spi_register_driver函数<br>    - 在出口函数中，注销spi_driver结构体，使用spi_unregister_driver函数</p>
+<p>4、初始化icm20608，从寄存器读取数据（如何使用linux 内核spi驱动的api来读写icm20608）<br>①、申请并初始化 spi_transfer，设置 spi_transfer 的 tx_buf 成员变量，tx_buf 为要发送的数据。然后设置 rx_buf 成员变量，rx_buf 保存着接收到的数据。最后设置 len 成员变量，也就是要进行数据通信的长度。</p>
+<p>②、使用 spi_message_init 函数初始化 spi_message。</p>
+<p>③、使用 spi_message_add_tail 函数将前面设置好的 spi_transfer 添加到 spi_message 队列中。</p>
+<p>④、使用 spi_sync 函数完成 SPI 数据同步传输，使用spi_sync函数时，传入的参数是 spi_device 和 spi_message。使用spi_async函数时，传入的参数是 spi_device、spi_message 和回调函数。</p>
+
     </div>
 
     
@@ -236,6 +269,10 @@
     
 
       <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Linux%E7%B3%BB%E7%BB%9F%E9%A9%B1%E5%8A%A8%E5%BC%80%E5%8F%91/" rel="tag"># Linux系统驱动开发</a>
+              <a href="/tags/%E9%80%9A%E4%BF%A1%E5%8D%8F%E8%AE%AE/" rel="tag"># 通信协议</a>
+          </div>
 
         
 
@@ -308,6 +345,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%B8%80%E3%80%81SPI-%E9%A9%B1%E5%8A%A8%E6%A1%86%E6%9E%B6"><span class="nav-number">1.</span> <span class="nav-text">一、SPI 驱动框架</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-1-%E8%A3%B8%E6%9C%BA%E4%B8%8B%E7%9A%84-SPI-%E9%A9%B1%E5%8A%A8%E6%A1%86%E6%9E%B6"><span class="nav-number">1.1.</span> <span class="nav-text">1.1 裸机下的 SPI 驱动框架</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-2-Linux-%E4%B8%8B%E7%9A%84-SPI-%E9%A9%B1%E5%8A%A8%E6%A1%86%E6%9E%B6"><span class="nav-number">1.2.</span> <span class="nav-text">1.2 Linux 下的 SPI 驱动框架</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-3-SPI-%E4%B8%BB%E6%9C%BA%E9%A9%B1%E5%8A%A8"><span class="nav-number">1.3.</span> <span class="nav-text">1.3 SPI 主机驱动</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#1-4-SPI%E8%AE%BE%E5%A4%87%E9%A9%B1%E5%8A%A8"><span class="nav-number">1.4.</span> <span class="nav-text">1.4 SPI设备驱动</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E9%A9%B1%E5%8A%A8%E7%BC%96%E5%86%99%E4%B8%8E%E6%B5%8B%E8%AF%95"><span class="nav-number">2.</span> <span class="nav-text">二、驱动编写与测试</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
